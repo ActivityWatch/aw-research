@@ -1,9 +1,15 @@
 import os
+import logging
 from typing import List
 
 import Algorithmia
 
-API_KEY = os.environ["ALGORITHMIA_API_KEY"]
+logger = logging.getLogger(__name__)
+
+if "ALGORITHMIA_API_KEY" in os.environ:
+    API_KEY = os.environ["ALGORITHMIA_API_KEY"]
+else:
+    logger.warn("Env variable ALGORITHMIA_API_KEY not set, Algorithmia will be unavailable.")
 
 
 def run_sentiment(docs: List[str]):

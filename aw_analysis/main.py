@@ -1,11 +1,16 @@
 from typing import List
 from pprint import pprint
+import logging
 
 from aw_core.models import Event
 from aw_client import ActivityWatchClient
 
+logging.basicConfig(level=logging.INFO)
+
 from .redact import redact_words
 from .algorithmia import *
+
+logger = logging.getLogger(__name__)
 
 
 def get_window_titles(events: List[Event]):
@@ -34,10 +39,12 @@ def load_sensitive_words():
 
 
 if __name__ == "__main__":
+    logger.info("Running analysis...")
+
     events = get_window_events()
 
-    sensitive_words = load_sensitive_words()
-    print(sensitive_words)
+    sensitive_words = list(load_sensitive_words())
+    logger.info("Sensitive words: " + str(sensitive_words))
     events = redact_words(events, sensitive_words)
 
     # titles = list(set(get_window_titles(events)))

@@ -1,4 +1,6 @@
 *.pyc
 __pycache__
 sensitive_words.txt
+*.*cache
+*.egg-info
 

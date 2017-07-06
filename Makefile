@@ -3,8 +3,11 @@ install-deps:
 	pip install -r requirements.txt
 
 build:
-	true
+	pip install .
+
+test:
+	pytest tests
 
 run:
-	python3 main.py
+	python3 -m aw_analysis.main
 

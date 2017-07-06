@@ -3,7 +3,6 @@ from pprint import pprint
 import logging
 
 from aw_core.models import Event
-from aw_client import ActivityWatchClient
 
 logging.basicConfig(level=logging.INFO)
 
@@ -13,11 +12,11 @@ from .algorithmia import *
 logger = logging.getLogger(__name__)
 
 
-def get_window_titles(events: List[Event]):
+def _get_window_titles(events: List[Event]):
     return [e.data["title"] for e in events]
 
 
-def get_window_events():
+def _get_window_events():
     client = ActivityWatchClient("aw-analyser", testing=True)
     buckets = client.get_buckets()
 
@@ -33,21 +32,23 @@ def get_window_events():
         return []
 
 
-def load_sensitive_words():
+def _load_sensitive_words():
     with open("sensitive_words.txt") as f:
         return (word for word in f.read().split("\n") if word)
 
 
 if __name__ == "__main__":
+    from aw_client import ActivityWatchClient
+
     logger.info("Running analysis...")
 
-    events = get_window_events()
+    events = _get_window_events()
 
-    sensitive_words = list(load_sensitive_words())
+    sensitive_words = list(_load_sensitive_words())
     logger.info("Sensitive words: " + str(sensitive_words))
     events = redact_words(events, sensitive_words)
 
-    # titles = list(set(get_window_titles(events)))
+    # titles = list(set(_get_window_titles(events)))
     # docs = titles
     # out = run_LDA(docs)
     # pprint(out.result)

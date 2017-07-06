@@ -1,8 +1,7 @@
-
-install-deps:
-	pip install -r requirements.txt
+.PHONY: build test run
 
 build:
+	pip install -r requirements.txt
 	pip install .
 
 test:
@@ -11,3 +10,5 @@ test:
 run:
 	python3 -m aw_analysis.main
 
+install-deps:
+	pip install -r requirements.txt

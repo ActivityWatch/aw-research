@@ -58,6 +58,9 @@ class Creator:
         self.title = None
         self.description = None
 
+        # This should be a database query in the future
+        self.creations = list()
+
         self.payment_methods = {}
 
     def __repr__(self):
@@ -73,13 +76,26 @@ class Creator:
             self.title = creator_data["snippet"]["title"]
             self.description = creator_data["snippet"]["description"]
 
-    def find_patreon(self):
-        patreon_link = find_patreon_link(self.description)
+    def find_payment_methods(self):
+        self._find_patreon(self.description)
+        self._find_bitcoin(self.description)
+
+        for c in self.creations:
+            if "patreon" not in self.payment_methods:
+                self._find_patreon(c.description)
+            if "bitcoin" not in self.payment_methods:
+                self._find_bitcoin(c.description)
+
+    def register_creation(self, creation: "Content"):
+        self.creations.append(creation)
+
+    def _find_patreon(self, text):
+        patreon_link = find_patreon_link(text)
         if patreon_link:
             self.payment_methods["patreon"] = patreon_link
 
-    def find_bitcoin(self):
-        bitcoin_addr = find_bitcoin_address(self.description)
+    def _find_bitcoin(self, text):
+        bitcoin_addr = find_bitcoin_address(text)
         if bitcoin_addr:
             self.payment_methods["bitcoin"] = bitcoin_addr
 
@@ -110,18 +126,6 @@ class Content:
             self.description = video_data["snippet"]["description"]
             self.data["channelId"] = video_data["snippet"]["channelId"]
 
-    def find_patreon(self):
-        patreon_link = find_patreon_link(self.description)
-        if patreon_link:
-            logger.warning("Found a patreon, but have no way to attach it to the creator: {}".format(patreon_link))
-            # TODO: This needs to get to the Creator object somehow
-            # self.payment_methods["patreon"] = patreon_link
-
-    def find_bitcoin(self):
-        bitcoin_addr = find_bitcoin_address(self.description)
-        if bitcoin_addr:
-            logger.warning("Found a bitcoin addr, but have no way to attach it to the creator: {}".format(bitcoin_addr))
-
     @property
     def url(self) -> Optional[str]:
         return "https://youtube.com/watch?v=" + self.id if self.id else None
@@ -145,7 +149,6 @@ def find_youtube_content(events) -> List[Content]:
 
     for event in events:
         if "youtube.com/watch?v=" in event.data["url"]:
-            # print("Found youtube event: ", event)
             found = re_video_id.findall(event.data["url"])
             if found:
                 video_id = found[0][8:]
@@ -165,12 +168,17 @@ def get_channels_from_videos(videos: List[Content]):
     for channel_id in channel_id_set:
         channel = channels[channel_id]
         channel.id = channel_id
-
         channel.add_youtube_data()
-        channel.find_bitcoin()
-        channel.find_patreon()
 
     return list(channels.values())
+
+
+def assign_videos_to_channels(videos, channels):
+    channels = {channel.id: channel for channel in channels}
+
+    for video in videos:
+        channel = channels[video.data["channelId"]]
+        channel.register_creation(video)
 
 
 if __name__ == "__main__":
@@ -182,9 +190,19 @@ if __name__ == "__main__":
     yt_videos = find_youtube_content(web_events)
     for video in yt_videos:
         video.add_youtube_data()
-        video.find_bitcoin()
-        video.find_patreon()
     # pprint(yt_videos)
 
     channels = get_channels_from_videos(yt_videos)
-    pprint(channels)
+    assign_videos_to_channels(yt_videos, channels)
+    for channel in channels:
+        channel.find_payment_methods()
+
+    n_with_payment_methods = len(list(filter(lambda c: c.payment_methods, channels)))
+    print("Number of found channels with payment methods: {} out of {}".format(n_with_payment_methods, len(channels)))
+
+    for method in ["bitcoin", "patreon"]:
+        n_with_method = len(list(filter(lambda c: method in c.payment_methods, channels)))
+        print(" - {}: {} out of {}".format(method, n_with_method, len(channels)))
+
+
+    # pprint(channels)

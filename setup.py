@@ -37,6 +37,7 @@ setup(name=about["__title__"],
       packages=set(["aw_analysis"]),
       install_requires=[
           'Algorithmia',
+          'pydash',
           'aw-core'],
       classifiers=[
           'Programming Language :: Python :: 3']

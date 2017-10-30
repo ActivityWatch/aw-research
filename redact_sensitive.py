@@ -3,6 +3,8 @@ Using this script you can actually redact your data,
 be careful to not delete stuff you want to keep!
 """
 
+# TODO: Use functions in package instead of the nested mess here
+
 import re
 
 from aw_client import ActivityWatchClient

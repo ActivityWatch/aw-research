@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 def _redact_full(event):
     for key in event.data:
-        event.data[key] = "redacted"
+        event.data[key] = "REDACTED"
     return event
 
 
@@ -27,7 +27,7 @@ def _redact(events: List[Event], f: Callable[[str], bool]) -> Tuple[List[Event],
 
 
 def redact_words(events, words):
-    words_pattern = "(" + "|".join((re.escape(bw) for bw in words)) + ")"
+    words_pattern = r"\b({})\b".format(("|".join(re.escape(bw) for bw in words)))
     r = re.compile(words_pattern)
     events, n_redacted = _redact(events, lambda s: r.search(s.lower()))
 

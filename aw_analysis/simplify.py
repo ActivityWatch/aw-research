@@ -15,9 +15,3 @@ def simplify(events):
         # Example: "Cemu - FPS: 59.2 - ..." -> "Cemu - - ..."
         e.data["title"] = re.sub(r"FPS:\s+[0-9\.]+", "", e.data["title"])
     return events
-
-
-# TODO: Turn into proper tests
-assert simplify([Event(data={"title": "(2) asd"})])[0].data["title"] == "asd"
-assert simplify([Event(data={"title": "(392) asd"})])[0].data["title"] == "asd"
-assert simplify([Event(data={"title": "Cemu - FPS: 12.2"})])[0].data["title"] == "Cemu - "

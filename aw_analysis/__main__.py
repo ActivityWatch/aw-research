@@ -8,11 +8,11 @@ from datetime import timedelta
 from aw_core.transforms import heartbeat_reduce
 from aw_client import ActivityWatchClient
 
-from .redact import redact_words
-from .algorithmia import run_sentiment, run_LDA
-from .flood import flood
-from .merge import merge_close_and_similar
-from .simplify import simplify
+from aw_analysis.redact import redact_words
+from aw_analysis.algorithmia import run_sentiment, run_LDA
+from aw_analysis.flood import flood
+from aw_analysis.merge import merge_close_and_similar
+from aw_analysis.simplify import simplify
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -24,8 +24,8 @@ def assert_no_overlap(events):
     for e1, e2 in zip(events[:-1], events[1:]):
         e1_end = e1.timestamp + e1.duration
         gap = e2.timestamp - e1_end
-        if gap <= timedelta(0):
-            print("Events overlapped: {}".format(gap))
+        if gap < timedelta(0):
+            logger.warning("Events overlapped: {}".format(gap))
             overlap = True
     assert not overlap
 
@@ -110,7 +110,7 @@ def _main_heartbeat_reduce():
 def _main_flood():
     logger.info("Retrieving events...")
     events = _get_window_events(n=10000)
-    events = flood(events)
+    events = simplify(events)
 
     logger.info("Flooding...")
     merged_events = flood(events)

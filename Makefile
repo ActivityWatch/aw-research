@@ -4,4 +4,4 @@ build:
 	pip install . -r requirements.txt
 
 test:
-	pytest tests
+	python3 -m pytest

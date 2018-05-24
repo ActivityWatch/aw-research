@@ -1,5 +1,5 @@
 from aw_core.models import Event
-from aw_analysis.simplify import simplify
+from aw_research.simplify import simplify
 
 
 def test_simplify():

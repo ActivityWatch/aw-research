@@ -6,9 +6,9 @@ __all__ = [
     "__email__", "__license__", "__copyright__",
 ]
 
-__title__ = "aw-analysis"
-__summary__ = "Analysis library for ActivityWatch"
-__uri__ = "https://github.com/ActivityWatch/aw-analysis"
+__title__ = "aw-research"
+__summary__ = "Research tools for ActivityWatch data"
+__uri__ = "https://github.com/ActivityWatch/aw-research"
 
 __version__ = "0.1.0"
 

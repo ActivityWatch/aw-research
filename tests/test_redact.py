@@ -1,6 +1,6 @@
 from aw_core.models import Event
 
-from aw_analysis.redact import redact_words
+from aw_research.redact import redact_words
 
 
 def test_redact_word():

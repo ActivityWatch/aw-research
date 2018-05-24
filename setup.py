@@ -10,7 +10,7 @@ from setuptools import setup
 base_dir = os.path.dirname(__file__)
 
 about = {}  # type: Any
-with open(os.path.join(base_dir, "aw_analysis", "__about__.py")) as f:
+with open(os.path.join(base_dir, "aw_research", "__about__.py")) as f:
     exec(f.read(), about)
 
 with open(os.path.join(base_dir, "README.md")) as f:
@@ -34,7 +34,7 @@ setup(name=about["__title__"],
       author=about["__author__"],
       author_email=about["__email__"],
       url=about["__uri__"],
-      packages=set(["aw_analysis"]),
+      packages=set(["aw_research"]),
       install_requires=[
           'Algorithmia',
           'pydash',

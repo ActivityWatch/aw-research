@@ -4,9 +4,6 @@ from typing import List
 from aw_core.models import Event
 from aw_client import ActivityWatchClient
 
-# Function was moved into aw_transform
-from aw_transform import filter_keyvals, filter_period_intersect
-
 
 logger = logging.getLogger(__name__)
 

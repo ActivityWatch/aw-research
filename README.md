@@ -1,9 +1,9 @@
-aw-analysis
+aw-research
 ===========
 
 [![Build Status](https://travis-ci.org/ActivityWatch/aw-analysis.svg?branch=master)](https://travis-ci.org/ActivityWatch/aw-analysis)
 
-Library for doing analysis on, and transforming, ActivityWatch data.
+Tools to analyse and experiment with ActivityWatch data.
 
 ## WARNING
 

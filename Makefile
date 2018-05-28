@@ -3,8 +3,10 @@
 build:
 	pip install . -r requirements.txt
 
-test:
+test: typecheck
 	python -m pytest tests
+
+typecheck:
 	MYPYPATH="numpy-data/numpy-mypy/" python -m mypy --ignore-missing-imports aw_research/ examples/*
 
 vis-aw-development:

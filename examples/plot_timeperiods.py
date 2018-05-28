@@ -1,6 +1,7 @@
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import numpy as np
+from typing import List, Tuple
 from matplotlib.dates import DateFormatter, SecondLocator
 import matplotlib.pyplot as plt
 from io import StringIO
@@ -9,11 +10,11 @@ import sys
 from iso8601 import parse_date as convdt
 
 
-def _construct_date_array(startdates):
+def _construct_date_array(startdates: List[datetime]) -> np.ndarray[str]:
     return np.array(list(map(lambda dt: dt.date().isoformat(), startdates)))
 
 
-def load_data(filepath):
+def load_data(filepath: str) -> Tuple[np.ndarray[datetime], np.ndarray[datetime], np.ndarray[str]]:
     with open(filepath) as f:
         data = json.load(f)[0]
     start = np.array([convdt(e['timestamp'].split(".")[0]) for e in data])
@@ -22,7 +23,7 @@ def load_data(filepath):
     return start, stop, state
 
 
-def load_data_example():
+def load_data_example() -> Tuple[np.ndarray[datetime], np.ndarray[datetime], np.ndarray[str]]:
     # The example data
     a = StringIO("""
     2018-05-23T10:15:22 2018-05-23T10:38:30 Chrome
@@ -38,11 +39,11 @@ def load_data_example():
     return data['start'], data['stop'], data['state']
 
 
-def same_date(dts):
-    return list(map(lambda dt: datetime.combine(datetime(1900, 1, 1), dt.time()), dts))
+def same_date(dts: List[datetime]):
+    return list(map(lambda dt: datetime.combine(date(1900, 1, 1), dt.time()), dts))
 
 
-def plot(start, stop, state, cap):
+def plot(start: np.ndarray[datetime], stop: np.ndarray[datetime], state: np.ndarray[str], cap: np.ndarray[str]):
     """Originally based on: https://stackoverflow.com/a/7685336/965332"""
     # Get unique captions, their indices, and the inverse mapping
     captions, unique_idx, caption_inv = np.unique(cap, 1, 1)

@@ -1,0 +1,10 @@
+window_events = query_bucket(find_bucket("aw-watcher-window_"));
+afk_events = query_bucket(find_bucket("aw-watcher-afk_"));
+window_events_active = filter_period_intersect(window_events, filter_keyvals(afk_events, "status", ["not-afk"]));
+
+cmt = "We should really add support for comments";
+
+events = filter_keyvals_regex(window_events_active, "title", "[Aa]ctivity[Ww]atch|aw-");
+cmd = 'events = merge_events_by_keys(events, "app", "title")';
+cmd = 'events = sort_by_duration(events)';
+RETURN = events;

@@ -4,6 +4,7 @@ import numpy as np
 from matplotlib.dates import DateFormatter, SecondLocator
 import matplotlib.pyplot as plt
 from io import StringIO
+import sys
 
 from iso8601 import parse_date as convdt
 
@@ -12,8 +13,8 @@ def _construct_date_array(startdates):
     return np.array(list(map(lambda dt: dt.date().isoformat(), startdates)))
 
 
-def load_data():
-    with open('query-result.json') as f:
+def load_data(filepath):
+    with open(filepath) as f:
         data = json.load(f)[0]
     start = np.array([convdt(e['timestamp'].split(".")[0]) for e in data])
     stop = np.array([convdt(e['timestamp']) + timedelta(seconds=e['duration']) for e in data])
@@ -41,11 +42,8 @@ def same_date(dts):
     return list(map(lambda dt: datetime.combine(datetime(1900, 1, 1), dt.time()), dts))
 
 
-def main():
+def plot(start, stop, state, cap):
     """Originally based on: https://stackoverflow.com/a/7685336/965332"""
-    start, stop, state = load_data()
-    cap = _construct_date_array(start)
-
     # Get unique captions, their indices, and the inverse mapping
     captions, unique_idx, caption_inv = np.unique(cap, 1, 1)
 
@@ -80,4 +78,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    fpath = sys.argv.pop()
+    start, stop, state = load_data(fpath)
+    cap = _construct_date_array(start)
+
+    plot(start, stop, state, cap)

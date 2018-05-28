@@ -1,7 +1,7 @@
 from aw_client import ActivityWatchClient
 
-from .classify import bucket_query
-from .filters import filter_period_intersect
+from aw_research.classify import bucket_query
+from aw_transform import filter_period_intersect
 
 
 def _check_nonoverlapping(events):

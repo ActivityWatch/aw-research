@@ -1,0 +1,3 @@
+[submodule "stubs/mypy-data"]
+	path = stubs/mypy-data
+	url = https://github.com/machinalis/mypy-data.git

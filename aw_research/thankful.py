@@ -65,7 +65,10 @@ class Creator:
 
     def __repr__(self):
         return "<Creator('{}', title='{}', payment_methods='{}')>".format(
-                self.id, self.title, "".join(self.payment_methods.keys()))
+            self.id,
+            self.title,
+            "".join(self.payment_methods.keys())
+        )
 
     def add_youtube_data(self):
         """This might not belon here when class is made more general"""
@@ -145,7 +148,7 @@ class Content:
 
 def find_youtube_content(events) -> List[Content]:
     """Finds YouTube content in events"""
-    videos = defaultdict(lambda: Content())
+    videos = defaultdict(lambda: Content())  # type: Dict[str, Content]
 
     for event in events:
         if "youtube.com/watch?v=" in event.data["url"]:
@@ -162,7 +165,7 @@ def find_youtube_content(events) -> List[Content]:
 
 def get_channels_from_videos(videos: List[Content]):
     """Finds channels from a set of videos"""
-    channels = defaultdict(lambda: Creator(service="youtube"))
+    channels = defaultdict(lambda: Creator(service="youtube"))  # type: Dict[str, Creator]
     channel_id_set = {video.data["channelId"] for video in videos}
 
     for channel_id in channel_id_set:
@@ -203,6 +206,5 @@ if __name__ == "__main__":
     for method in ["bitcoin", "patreon"]:
         n_with_method = len(list(filter(lambda c: method in c.payment_methods, channels)))
         print(" - {}: {} out of {}".format(method, n_with_method, len(channels)))
-
 
     # pprint(channels)

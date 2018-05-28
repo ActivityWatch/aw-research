@@ -33,8 +33,8 @@ def main(dryrun=True):
                                for word in sensitive_words]
                     matches = set(sum(matches, []))
                     if matches:
-                        print("Matches: {}, redacting: {}".format(matches, val))
                         event.data[key] = "REDACTED"
+                        print("{}Matches: {}, redacting: {}".format("DRYRUN " if dryrun else "", matches, val))
                         if not dryrun:
                             aw.insert_event(bid, event)
 

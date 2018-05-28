@@ -20,10 +20,8 @@ def color_gen():
 def barchart(x: List[datetime], bar_sets: List[List[float]]):
     """
     Based on:
-
      - https://stackoverflow.com/questions/17827748/matplotilb-bar-chart-diagonal-tick-labels
      - https://matplotlib.org/examples/pylab_examples/bar_stacked.html
-     -
     """
     plt.figure()
 
@@ -36,7 +34,7 @@ def barchart(x: List[datetime], bar_sets: List[List[float]]):
     # ax.set_xticklabels(["{}:{:02d}".format(dt.hour, dt.minute) for dt in x], rotation=45)
 
     n = len(bar_sets[0])
-    bottom = [0] * n
+    bottom = [0.0] * n
     colors = color_gen()
     for bars in bar_sets:
         color = next(colors)
@@ -45,6 +43,7 @@ def barchart(x: List[datetime], bar_sets: List[List[float]]):
 
     ax.legend()
     plt.show()
+
 
 if __name__ == "__main__":
     plt.style.use('ggplot')

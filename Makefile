@@ -4,10 +4,10 @@ build:
 	pip install . -r requirements.txt
 
 test: typecheck
-	python -m pytest tests
+	python -m pytest tests/
 
 typecheck:
-	MYPYPATH="numpy-data/numpy-mypy/" python -m mypy --ignore-missing-imports aw_research/ examples/*
+	MYPYPATH="numpy-data/numpy-mypy/" python -m mypy --ignore-missing-imports aw_research/ examples/ tests/
 
 vis-aw-development:
 	python3 -m aw_client --host localhost:5666 query --json --start 2018-01-01 queries/aw-development.awq > .cache-query-result

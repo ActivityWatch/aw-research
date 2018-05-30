@@ -38,7 +38,12 @@ setup(name=about["__title__"],
       install_requires=[
           'Algorithmia',
           'pydash',
-          'aw-core'],
+          'aw-core',
+          'aw-client',
+          'google-api-python-client',
+          'numpy',
+          'matplotlib',
+      ],
       classifiers=[
           'Programming Language :: Python :: 3']
       )

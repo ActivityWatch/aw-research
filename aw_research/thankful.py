@@ -19,7 +19,7 @@ re_bitcoin_addr = re.compile(r"[13][a-km-zA-HJ-NP-Z1-9]{25,34}")
 
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
-YOUTUBE_DEVELOPER_KEY = "AIzaSyCUnQRiX0axfETg6YrbppATN2nuNJ2zdw" + str(8)  # slight obfuscation to prevent automated mining
+YOUTUBE_DEVELOPER_KEY = "AIzaSyDSB0CRo8l4cLhxZtOSWEGuAUXfUMUBEV" + "Y"  # slight obfuscation to prevent automated mining
 youtube = apiclient.discovery.build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
                                     developerKey=YOUTUBE_DEVELOPER_KEY)
 
@@ -52,9 +52,9 @@ assert find_patreon_link("patreon.com/3blue1brown")
 class Creator:
     """Creators are currently bound to platforms since cross-platform
        identity is still a non-trivial problem"""
-    def __init__(self, service=None, id=None):
-        self.service = None
-        self.id = None
+    def __init__(self, service=None, identifier=None):
+        self.service = service
+        self.id = identifier
         self.title = None
         self.description = None
 
@@ -104,8 +104,8 @@ class Creator:
 
 
 class Content:
-    def __init__(self, id=None, title=None):
-        self.id = id
+    def __init__(self, identifier=None, title=None):
+        self.id = identifier
         self.title = title
         self.description = None
 
@@ -121,13 +121,16 @@ class Content:
         """This might not belong here when class is made more general"""
         # API Explorer: https://developers.google.com/apis-explorer/#p/youtube/v3/youtube.videos.list
         # Code example: https://github.com/youtube/api-samples/blob/master/python/search.py
-        response = youtube.videos().list(id=self.id, part="snippet").execute()
-        if response["items"]:
-            video_data = response["items"][0]
-            self.id = video_data["id"]
-            self.title = video_data["snippet"]["title"]
-            self.description = video_data["snippet"]["description"]
-            self.data["channelId"] = video_data["snippet"]["channelId"]
+        try:
+            response = youtube.videos().list(id=self.id, part="snippet").execute()
+            if response["items"]:
+                video_data = response["items"][0]
+                self.id = video_data["id"]
+                self.title = video_data["snippet"]["title"]
+                self.description = video_data["snippet"]["description"]
+                self.data["channelId"] = video_data["snippet"]["channelId"]
+        except apiclient.errors.HttpError as e:
+            print(e.content)
 
     @property
     def url(self) -> Optional[str]:
@@ -166,7 +169,7 @@ def find_youtube_content(events) -> List[Content]:
 def get_channels_from_videos(videos: List[Content]):
     """Finds channels from a set of videos"""
     channels = defaultdict(lambda: Creator(service="youtube"))  # type: Dict[str, Creator]
-    channel_id_set = {video.data["channelId"] for video in videos}
+    channel_id_set = {video.data["channelId"] for video in videos if "channelId" in video.data}
 
     for channel_id in channel_id_set:
         channel = channels[channel_id]
@@ -180,15 +183,16 @@ def assign_videos_to_channels(videos, channels):
     channels = {channel.id: channel for channel in channels}
 
     for video in videos:
-        channel = channels[video.data["channelId"]]
-        channel.register_creation(video)
+        if "channelId" in video.data:
+            channel = channels[video.data["channelId"]]
+            channel.register_creation(video)
 
 
-if __name__ == "__main__":
+def _main():
     logging.basicConfig(level=logging.DEBUG)
 
     awapi = aw_client.ActivityWatchClient("thankful-test", testing=True)
-    web_events = awapi.get_events(bucket_id="aw-watcher-web-test", limit=-1)
+    web_events = awapi.get_events(bucket_id="aw-watcher-web-chrome", limit=-1)
 
     yt_videos = find_youtube_content(web_events)
     for video in yt_videos:
@@ -208,3 +212,7 @@ if __name__ == "__main__":
         print(" - {}: {} out of {}".format(method, n_with_method, len(channels)))
 
     # pprint(channels)
+
+
+if __name__ == "__main__":
+    _main()

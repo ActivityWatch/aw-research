@@ -1,6 +1,5 @@
 from aw_client import ActivityWatchClient
 
-from aw_research.classify import bucket_query
 from aw_transform import filter_period_intersect
 
 
@@ -24,11 +23,8 @@ def all_active_webactivity():
     """Returns activity during non-afk events or when tab is audible"""
     awapi = ActivityWatchClient("test", testing=True)
 
-    bid = bucket_query(awapi, bucket_type="current_webpage")
-    tabevents = awapi.get_events(bid, limit=-1)
-
-    bid = bucket_query(awapi, bucket_type="afkstatus")
-    afkevents = awapi.get_events(bid, limit=-1)
+    tabevents = awapi.get_events("aw-watcher-web-chrome", limit=-1)
+    afkevents = awapi.get_events("aw-watcher-afk_erb-laptop2-arch", limit=-1)
 
     afkevents_notafk = list(filter(lambda e: e.data["status"] == "not-afk", afkevents))
     tabevents_audible = list(filter(lambda e: "audible" in e.data and e.data["audible"], tabevents))

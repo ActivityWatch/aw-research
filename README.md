@@ -1,7 +1,7 @@
 aw-research
 ===========
 
-[![Build Status](https://travis-ci.org/ActivityWatch/aw-analysis.svg?branch=master)](https://travis-ci.org/ActivityWatch/aw-analysis)
+[![Build Status](https://travis-ci.org/ActivityWatch/aw-research.svg?branch=master)](https://travis-ci.org/ActivityWatch/aw-research)
 
 Tools to analyse and experiment with ActivityWatch data.
 

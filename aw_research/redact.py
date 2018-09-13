@@ -27,7 +27,7 @@ def _redact(events: List[Event], f: Callable[[str], bool]) -> Tuple[List[Event],
 
 
 def redact_words(events, words):
-    words_pattern = r"\b({})\b".format(("|".join(re.escape(bw) for bw in words)))
+    words_pattern = r"\b({})\b".format(("|".join(re.escape(bw.lower()) for bw in words)))
     r = re.compile(words_pattern)
     events, n_redacted = _redact(events, lambda s: r.search(s.lower()))
 

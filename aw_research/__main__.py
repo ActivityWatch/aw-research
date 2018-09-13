@@ -5,14 +5,15 @@ from pprint import pprint
 from collections import defaultdict
 from datetime import timedelta
 
-from aw_core.transforms import heartbeat_reduce
+from aw_transform import heartbeat_reduce
+from aw_transform.flood import flood
+from aw_transform import simplify
+
 from aw_client import ActivityWatchClient
 
-from aw_analysis.redact import redact_words
-from aw_analysis.algorithmia import run_sentiment, run_LDA
-from aw_analysis.flood import flood
-from aw_analysis.merge import merge_close_and_similar
-from aw_analysis.simplify import simplify
+from aw_research.redact import redact_words
+from aw_research.algorithmia import run_sentiment, run_LDA
+from aw_research.merge import merge_close_and_similar
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,12 +49,12 @@ def _get_window_events(n=1000):
 
 def _load_sensitive_words():
     with open("sensitive_words.txt") as f:
-        return (word for word in f.read().split("\n") if word)
+        return (word.lower() for word in f.read().split("\n") if word)
 
 
 def _main_redact():
     logger.info("Retrieving events...")
-    events = _get_window_events()
+    events = _get_window_events(n=1000)
 
     logger.info("Redacting...")
     sensitive_words = list(_load_sensitive_words())

@@ -8,7 +8,6 @@ matrix:
    - python: "nightly"
 
 install:
- - "pip install -r dev-requirements.txt"
  - "make build"
 
 script:

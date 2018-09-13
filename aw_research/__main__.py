@@ -7,7 +7,7 @@ from datetime import timedelta
 
 from aw_transform import heartbeat_reduce
 from aw_transform.flood import flood
-from aw_transform import simplify
+from aw_transform.simplify import simplify_string
 
 from aw_client import ActivityWatchClient
 
@@ -54,7 +54,7 @@ def _load_sensitive_words():
 
 def _main_redact():
     logger.info("Retrieving events...")
-    events = _get_window_events(n=1000)
+    events = _get_window_events()
 
     logger.info("Redacting...")
     sensitive_words = list(_load_sensitive_words())
@@ -64,7 +64,7 @@ def _main_redact():
 
 def _main_analyse():
     logger.info("Retrieving events...")
-    events = _get_window_events(n=500)
+    events = _get_window_events()
 
     logger.info("Running analysis...")
     titles = list({e.data["title"] for e in events})
@@ -80,8 +80,8 @@ def _main_analyse():
 
 def _main_merge():
     logger.info("Retrieving events...")
-    events = _get_window_events(n=10000)
-    events = simplify(events)
+    events = _get_window_events(n=1000)
+    events = simplify_string(events)
 
     merged_events = merge_close_and_similar(events)
     print("{} events became {} after merging of similar ones".format(len(events), len(merged_events)))
@@ -95,8 +95,8 @@ def _main_merge():
 
 def _main_heartbeat_reduce():
     logger.info("Retrieving events...")
-    events = _get_window_events(n=10000)
-    events = simplify(events)
+    events = _get_window_events()
+    events = simplify_string(events)
 
     logger.info("Beating hearts together...")
     merged_events = heartbeat_reduce(events, pulsetime=10)
@@ -110,8 +110,8 @@ def _main_heartbeat_reduce():
 
 def _main_flood():
     logger.info("Retrieving events...")
-    events = _get_window_events(n=10000)
-    events = simplify(events)
+    events = _get_window_events()
+    events = simplify_string(events)
 
     logger.info("Flooding...")
     merged_events = flood(events)
@@ -158,12 +158,6 @@ if __name__ == "__main__":
     elif action == "flood":
         _main_flood()
     elif action == "heartbeat":
-        _main_heartbeat_reduce()
-    elif action == "all":
-        _main_redact()
-        _main_analyse()
-        _main_merge()
-        _main_flood()
         _main_heartbeat_reduce()
     else:
         print("Invalid action {}".format(action))

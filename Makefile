@@ -6,6 +6,13 @@ build:
 test: typecheck
 	pipenv run pytest tests/
 
+test-integration:
+	pipenv run python3 aw_research redact
+	pipenv run python3 aw_research merge
+	pipenv run python3 aw_research flood
+	pipenv run python3 aw_research heartbeat
+	#pipenv run python3 aw_research analyse
+
 typecheck:
 	MYPYPATH="numpy-data/numpy-mypy/" python -m mypy --ignore-missing-imports aw_research/ examples/ tests/
 

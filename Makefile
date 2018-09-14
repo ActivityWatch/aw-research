@@ -11,6 +11,7 @@ test-integration:
 	pipenv run python3 aw_research merge
 	pipenv run python3 aw_research flood
 	pipenv run python3 aw_research heartbeat
+	pipenv run python3 -m aw_research.classify
 	#pipenv run python3 aw_research analyse
 
 typecheck:

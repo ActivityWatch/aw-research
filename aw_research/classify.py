@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Set
 from urllib.parse import urlparse
 from collections import Counter
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pprint import pprint
 import re
 
@@ -13,21 +13,28 @@ import pydash
 
 
 classes = {
-    r'[Aa]ctivity[Ww]atch|aw-.*': 'ActivityWatch',
-    r'[Cc]rypto[Tt]ax': 'CryptoTax',
-    r'[Ss]potify|[Ss]oundcloud': 'Music',
+    r'[Ss]potify|[Ss]oundcloud|Mixxx': 'Music',
     r'[Yy]ouTube|[Vv]imeo|[Pp]lex': 'Video',
-    r'[Pp]rogramming|[Gg]it[Hh]ub|[Pp]ython|[Mm]atplotlib|localhost': "Programming",
-    r'[Ss]chool|LTH|FAFF25|FMAN20|exam|[0-9]{4}_[0-9]{2}_[0-9]{2}\.pdf': "School",
+    r'[Pp]rogramming|[Gg]it[Hh]ub|[Pp]ython|[Mm]atplotlib|localhost|Pull Request': "Programming",
+    r'[Ss]chool|LTH|FAFF25|FMAN20|exam|[0-9]{4}_[0-9]{2}_[0-9]{2}\.pdf|Tent': "School",
+    r'Google (Sheets|Slides)': "Work",
     r'(Khan Academy)|(Wolfram\|Alpha)': "Maths",
     r'Messenger|(messaged you)': "Communication",
     r'Gmail': "Communication",
     r'Google Search': "Searching",
     r'[Ff]acebook|[Rr]eddit|[Tt]witter': "Social Media",
     r'NCBI|PubMed': "Research",
-    r'Google Docs|Standard Notes': "Writing",
+    r'Google Docs|Standard Notes|Editing.*Wikipedia': "Writing",
+    r'Avanza|Cryptowatch': "Finance",
+    r'SVT Nyheter': "News",
     r'Ebay|Amazon|DECIEM|Huel|H\&M|Topman': "Shopping",
+    r'[Pp]orn': "Porn",
     r'/(media-)?annex/': "Archiving",
+
+    # Projects
+    r'[Aa]ctivity[Ww]atch|aw-.*': 'ActivityWatch',
+    r'[Cc]rypto[Tt]ax': 'CryptoTax',
+    r'apartmentrank|Programming/apartment': 'apartmentrank'
 }
 
 parent_categories = {
@@ -37,6 +44,7 @@ parent_categories = {
     'CryptoTax': ('Programming',),
     'Programming': ('Work',),
     'School': ('Work',),
+    'Writing': ('Work',),
 }
 
 
@@ -98,7 +106,7 @@ def time_per_category(events):
 
 def get_events(bid):
     return ActivityWatchClient("test", testing=True) \
-        .get_events(bid, limit=-1)
+        .get_events(bid, start=datetime.now() - timedelta(days=7), limit=-1)
 
 
 def test_hostname():
@@ -107,10 +115,11 @@ def test_hostname():
 
 
 def _print_unclassified(events, n=10):
-    for i, e in enumerate(e for e in sorted(events, key=lambda e: -e.duration) if "Uncategorized" in e.data["categories"]):
-        print(e.duration, e.data)
-        if i > n:
-            break
+    print("Unclassified")
+    uncategorized = [e for e in sorted(events, key=lambda e: -e.duration) if "Uncategorized" in e.data["categories"]]
+    groups = {k: sum((e.duration for e in v), timedelta(0)) for k, v in pydash.group_by(uncategorized, lambda e: e.data['title']).items()}
+    for k, v in list(sorted(groups.items(), key=lambda g: -g[1]))[:n]:
+        print(v, k)
 
 
 def _main():
@@ -121,12 +130,14 @@ def _main():
 
     # TODO: Use a query and filter AFK
     events = get_events("aw-watcher-window_erb-laptop2-arch")
+    print(min(e.timestamp for e in events), max(e.timestamp + e.duration for e in events))
     events = classify(events)
     # pprint([e.data["categories"] for e in classify(events)])
+    print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
     for c, s in time_per_category(events).most_common():
         print("{}\t{}".format(timedelta(seconds=s), c))
 
-    # _print_unclassified(events, 30)
+    _print_unclassified(events, 30)
 
 
 if __name__ == "__main__":

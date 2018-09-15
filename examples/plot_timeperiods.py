@@ -60,7 +60,7 @@ def plot(start: "np.ndarray[datetime]", stop: "np.ndarray[datetime]", state: "np
 
     # Build colors
     states, _, states_inv = np.unique(state, 1, 1)
-    cmap = plt.get_cmap('Set1')
+    cmap = plt.get_cmap('tab10')
     colors = cmap(np.linspace(0, 1, len(states)))
 
     # Plot function
@@ -83,7 +83,7 @@ def plot(start: "np.ndarray[datetime]", stop: "np.ndarray[datetime]", state: "np
     ax.xaxis.set_major_locator(SecondLocator(interval=60 * 60))  # used to be SecondLocator(0, interval=20)
     plt.xlabel('Time')
     plt.setp(plt.gca().get_xticklabels(), rotation=45, horizontalalignment='right')
-    plt.xlim(datetime(1900, 1, 1, 8), datetime(1900, 1, 1, 22))
+    plt.xlim(datetime(1900, 1, 1, 0), datetime(1900, 1, 1, 23, 59))
 
     # Setup the yaxis
     plt.ylabel('Date')

@@ -26,6 +26,7 @@ def main(dryrun=True):
         print("Checking bucket: {}".format(bid))
 
         events = aw.get_events(bid, limit=-1)
+        old_matches = set()
         for event in events:
             for key, val in event.data.items():
                 if isinstance(val, str):
@@ -34,7 +35,9 @@ def main(dryrun=True):
                     matches = set(sum(matches, []))
                     if matches:
                         event.data[key] = "REDACTED"
-                        print("{}Matches: {}, redacting: {}".format("DRYRUN " if dryrun else "", matches, val))
+                        if val not in old_matches:
+                            print(f"{'(DRYRUN) ' if dryrun else ''} Matches: {matches}, redacting: {val}")
+                            old_matches.add(val)
                         if not dryrun:
                             aw.insert_event(bid, event)
 

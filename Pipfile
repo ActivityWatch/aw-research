@@ -5,7 +5,6 @@ name = "pypi"
 
 [packages]
 aw-research = {editable = true, path = "."}
-aw-core = {editable = true, git = "https://github.com/ActivityWatch/aw-core.git"}
 aw-client = {editable = true, git = "https://github.com/ActivityWatch/aw-client.git"}
 numpy = "*"
 matplotlib = "*"

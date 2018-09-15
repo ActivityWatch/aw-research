@@ -5,6 +5,6 @@ window_events_active = filter_period_intersect(window_events, filter_keyvals(afk
 cmt = "We should really add support for comments";
 
 events = filter_keyvals_regex(window_events_active, "title", "[Aa]ctivity[Ww]atch|aw-");
-cmd = 'events = merge_events_by_keys(events, "app", "title")';
-cmd = 'events = sort_by_duration(events)';
+cmt = 'events = merge_events_by_keys(events, "app", "title")';
+cmt = 'events = sort_by_duration(events)';
 RETURN = events;

@@ -11,7 +11,8 @@ test-integration:
 	pipenv run python3 aw_research merge
 	pipenv run python3 aw_research flood
 	pipenv run python3 aw_research heartbeat
-	pipenv run python3 -m aw_research.classify
+	pipenv run python3 aw_research classify summary
+	pipenv run python3 aw_research classify cat Uncategorized
 	pipenv run python3 examples/afk_and_audible.py
 	pipenv run python3 examples/redact_sensitive.py
 	make vis-aw-development

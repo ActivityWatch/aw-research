@@ -14,6 +14,8 @@ from aw_client import ActivityWatchClient
 from aw_research.redact import redact_words
 from aw_research.algorithmia import run_sentiment, run_LDA
 from aw_research.merge import merge_close_and_similar
+from aw_research.classify import _main as _main_classify
+from aw_research.classify import _build_argparse as _build_argparse_classify
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -142,22 +144,29 @@ def print_most_common_titles(events):
 
 
 if __name__ == "__main__":
-    args = list(sys.argv)
-    args.pop(0)
-    if len(args) > 0:
-        action = args.pop(0)
-    else:
-        raise Exception("You need to specify an action")
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="cmd")
+    subparsers.add_parser('redact')
+    subparsers.add_parser('analyse')
+    subparsers.add_parser('merge')
+    subparsers.add_parser('flood')
+    subparsers.add_parser('heartbeat')
+    classify = subparsers.add_parser('classify')
+    _build_argparse_classify(classify)
 
-    if action == "redact":
+    args = parser.parse_args()
+
+    if args.cmd == "redact":
         _main_redact()
-    elif action == "analyse":
+    elif args.cmd == "analyse":
         _main_analyse()
-    elif action == "merge":
+    elif args.cmd == "merge":
         _main_merge()
-    elif action == "flood":
+    elif args.cmd == "flood":
         _main_flood()
-    elif action == "heartbeat":
+    elif args.cmd == "heartbeat":
         _main_heartbeat_reduce()
+    elif args.cmd == "classify":
+        _main_classify(args)
     else:
-        print("Invalid action {}".format(action))
+        print(f"unknown subcommand: {args.cmd}")

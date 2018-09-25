@@ -2,56 +2,30 @@ from typing import List, Dict, Any, Set
 from urllib.parse import urlparse
 from collections import Counter
 from datetime import datetime, timedelta
-from pprint import pprint
+import argparse
 import re
 
-
 from aw_core.models import Event
+from aw_transform import flood
 from aw_client import ActivityWatchClient
 
 import pydash
 
 
-classes = {
-    r'[Ss]potify|[Ss]oundcloud|Mixxx': 'Music',
-    r'[Yy]ouTube|[Vv]imeo|[Pp]lex': 'Video',
-    r'[Pp]rogramming|[Gg]it[Hh]ub|[Pp]ython|[Mm]atplotlib|localhost|Pull Request': "Programming",
-    r'[Ss]chool|LTH|FAFF25|FMAN20|exam|[0-9]{4}_[0-9]{2}_[0-9]{2}\.pdf|Tent': "School",
-    r'Google (Sheets|Slides)': "Work",
-    r'(Khan Academy)|(Wolfram\|Alpha)': "Maths",
-    r'Messenger|(messaged you)': "Communication",
-    r'Gmail': "Communication",
-    r'Google Search': "Searching",
-    r'[Ff]acebook|[Rr]eddit|[Tt]witter': "Social Media",
-    r'NCBI|PubMed': "Research",
-    r'Google Docs|Standard Notes|Editing.*Wikipedia': "Writing",
-    r'Avanza|Cryptowatch': "Finance",
-    r'SVT Nyheter': "News",
-    r'Ebay|Amazon|DECIEM|Huel|H\&M|Topman': "Shopping",
-    r'[Pp]orn': "Porn",
-    r'/(media-)?annex/': "Archiving",
+def read_csv_mapping(filename) -> Dict[str, str]:
+    with open(filename) as f:
+        lines = [line.strip().split(";")[:2] for line in f.readlines() if line.strip() and not line.startswith("#")]
+        return dict(lines)
 
-    # Projects
-    r'[Aa]ctivity[Ww]atch|aw-.*': 'ActivityWatch',
-    r'[Cc]rypto[Tt]ax': 'CryptoTax',
-    r'apartmentrank|Programming/apartment': 'apartmentrank'
-}
 
-parent_categories = {
-    'Music': ('Entertainment',),
-    'Video': ('Entertainment',),
-    'ActivityWatch': ('Programming',),
-    'CryptoTax': ('Programming',),
-    'Programming': ('Work',),
-    'School': ('Work',),
-    'Writing': ('Work',),
-}
+classes = read_csv_mapping('category_regexes.csv')
+parent_categories = read_csv_mapping('parent_categories.csv')
 
 
 def get_parent_categories(cat: str) -> set:
     # Recursive
     if cat in parent_categories:
-        cats = set(parent_categories[cat])
+        cats = {parent_categories[cat]}
         for parent in tuple(cats):
             cats |= get_parent_categories(parent)
         return cats
@@ -95,7 +69,6 @@ def duration_of_groups(groups: Dict[Any, List[Event]]):
 
 
 def time_per_category(events):
-    # Events need to be categorized
     c = Counter()
     for e in events:
         cats = e.data["categories"]
@@ -104,9 +77,19 @@ def time_per_category(events):
     return c
 
 
+def time_per_category_with_flooding(events):
+    cats = {cat for e in events for cat in e.data["categories"]}
+    c = Counter()
+    for cat in cats:
+        events_with_cat = [e for e in events if cat in e.data["categories"]]
+        events_with_cat_flooded = flood(events_with_cat, pulsetime=60)
+        c[cat] += sum(e.duration.total_seconds() for e in events_with_cat_flooded)
+    return c
+
+
 def get_events(bid):
     return ActivityWatchClient("test", testing=True) \
-        .get_events(bid, start=datetime.now() - timedelta(days=7), limit=-1)
+        .get_events(bid, start=datetime.now() - timedelta(days=14), limit=-1)
 
 
 def test_hostname():
@@ -114,31 +97,49 @@ def test_hostname():
     assert _hostname("https://github.com/") == "github.com"
 
 
-def _print_unclassified(events, n=10):
-    print("Unclassified")
-    uncategorized = [e for e in sorted(events, key=lambda e: -e.duration) if "Uncategorized" in e.data["categories"]]
-    groups = {k: sum((e.duration for e in v), timedelta(0)) for k, v in pydash.group_by(uncategorized, lambda e: e.data['title']).items()}
+def _print_category(events, cat="Uncategorized", n=10):
+    print(f"Showing top {n} from category: {cat}")
+    events = [e for e in sorted(events, key=lambda e: -e.duration) if cat in e.data["categories"]]
+    print(f"Total time: {sum((e.duration for e in events[1:]), events[0].duration)}")
+    groups = {k: sum((e.duration for e in v), timedelta(0)) for k, v in pydash.group_by(events, lambda e: e.data['title']).items()}
     for k, v in list(sorted(groups.items(), key=lambda g: -g[1]))[:n]:
         print(v, k)
 
 
-def _main():
+def _build_argparse(parser):
+    subparsers = parser.add_subparsers(dest='cmd2')
+    summary = subparsers.add_parser('summary')
+    category = subparsers.add_parser('cat')
+    category.add_argument('category')
+    unclassified = subparsers.add_parser('unclassified')
+    return parser
+
+
+def _main(args):
     # events = get_events("aw-watcher-web-chrome")
     # groups = group_by_url_hostname(events)
     # duration_pairs = pydash.to_pairs(duration_of_groups(groups))
     # pprint(sorted(duration_pairs, key=lambda p: p[1]))
 
-    # TODO: Use a query and filter AFK
-    events = get_events("aw-watcher-window_erb-laptop2-arch")
-    print(min(e.timestamp for e in events), max(e.timestamp + e.duration for e in events))
-    events = classify(events)
-    # pprint([e.data["categories"] for e in classify(events)])
-    print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
-    for c, s in time_per_category(events).most_common():
-        print("{}\t{}".format(timedelta(seconds=s), c))
-
-    _print_unclassified(events, 30)
+    if args.cmd2 in ["summary", 'cat']:
+        # TODO: Use a query and filter AFK
+        events = get_events("aw-watcher-window_erb-laptop2-arch")
+        print(min(e.timestamp for e in events), max(e.timestamp + e.duration for e in events))
+        events = classify(events)
+        # pprint([e.data["categories"] for e in classify(events)])
+        if args.cmd2 == "summary":
+            print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
+            time_per_cat = time_per_category_with_flooding(events)
+            for c, s in time_per_cat.most_common():
+                print("{}\t{}".format(timedelta(seconds=s), c))
+        elif args.cmd2 == "cat":
+            _print_category(events, args.category, 30)
+    else:
+        print(f'unknown subcommand to classify: {args.cmd2}')
 
 
 if __name__ == "__main__":
-    _main()
+    parser = argparse.ArgumentParser(description='')
+    parser = _build_argparse(parser)
+    parser.parse_args()
+    _main(args)

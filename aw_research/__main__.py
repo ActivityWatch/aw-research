@@ -1,6 +1,5 @@
 import logging
 import argparse
-import sys
 from pprint import pprint
 from collections import defaultdict
 from datetime import timedelta
@@ -169,4 +168,4 @@ if __name__ == "__main__":
     elif args.cmd == "classify":
         _main_classify(args)
     else:
-        print(f"unknown subcommand: {args.cmd}")
+        parser.print_usage()

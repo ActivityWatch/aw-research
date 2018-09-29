@@ -14,7 +14,7 @@ import pydash
 
 def read_csv_mapping(filename) -> Dict[str, str]:
     with open(filename) as f:
-        lines = [line.strip().split(";")[:2] for line in f.readlines() if line.strip() and not line.startswith("#")]
+        lines = [tuple(line.strip().split(";")[:2]) for line in f.readlines() if line.strip() and not line.startswith("#")]
         return dict(lines)
 
 
@@ -89,7 +89,7 @@ def time_per_category_with_flooding(events):
 
 def get_events(bid):
     return ActivityWatchClient("test", testing=True) \
-        .get_events(bid, start=datetime.now() - timedelta(days=14), limit=-1)
+        .get_events(bid, start=datetime.now() - timedelta(days=180), limit=-1)
 
 
 def test_hostname():
@@ -131,7 +131,11 @@ def _main(args):
             print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
             time_per_cat = time_per_category_with_flooding(events)
             for c, s in time_per_cat.most_common():
-                print("{}\t{}".format(timedelta(seconds=s), c))
+                hours, remainder = divmod(s, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                print((f"{int(hours)}h".rjust(4) if hours else '').ljust(5) +
+                      (f"{int(minutes)}m".rjust(3) if minutes else '').ljust(4) +
+                      (f"{int(seconds)}s".rjust(3) + f"    {c}"))
         elif args.cmd2 == "cat":
             _print_category(events, args.category, 30)
     else:
@@ -141,5 +145,5 @@ def _main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
     parser = _build_argparse(parser)
-    parser.parse_args()
+    args = parser.parse_args()
     _main(args)

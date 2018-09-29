@@ -15,4 +15,4 @@ pipenv install
 pipenv run python3 -m aw_research --help
 ```
 
-To use some of the analysis methods you need to create some configuration files manually, examples of these will be added later.
+To use some of the analysis methods you need to create some configuration files manually, see the `.example` files for how they should look.

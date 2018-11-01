@@ -40,6 +40,8 @@ def classify(events):
         r = re.compile(re_pattern)
         for event in events:
             for attr in ["title", "app"]:
+                if attr not in event.data:
+                    continue
                 if cat not in event.data["categories"] and \
                    r.findall(event.data[attr]):
                     event.data["categories"].add(cat)
@@ -87,28 +89,35 @@ def time_per_category_with_flooding(events):
     return c
 
 
-def get_events() -> List[Event]:
-    awc = ActivityWatchClient("test", testing=True)
-    browsernames = ["Chromium"]
-    query = f"""
-    events_window = flood(query_bucket(find_bucket("aw-watcher-window")));
+# The following function is later turned into a query string through introspection.
+# Because of this, any comment inside the function will break the query (as the query2 language doesn't yet support comments).
+# Fancy logic will obviously not work either.
+# TODO: Make semicolons optional in query2, just like normal Python.
+# TODO: Include more browsers
+def query_func():  # noqa
+    browsernames = ["Chromium"];
+    events = flood(query_bucket(find_bucket("aw-watcher-window")));
     events_afk = flood(query_bucket(find_bucket("aw-watcher-afk")));
-    events = filter_period_intersect(events_window, filter_keyvals(events_afk, "status", ["not-afk"]));
+    events = filter_period_intersect(events, filter_keyvals(events_afk, "status", ["not-afk"]));
 
     events_web = flood(query_bucket(find_bucket("aw-watcher-web")));
-    events_browser = filter_keyvals(events, "app", {str(browsernames)});
+    events_browser = filter_keyvals(events, "app", browsernames);
     events_web = filter_period_intersect(events_web, events_browser);
+    events = exclude_keyvals(events, "app", browsernames);
 
-    RETURN = events;
-    """
-    # TODO: The query method should return a list of events if a single interval is given, not a list with one list for the one interval.
-    new_way = 1
-    if new_way:
-        result = awc.query(query, start=datetime.now() - timedelta(days=30), end=datetime.now())
-        return [Event(**e) for e in result[0]]
-    else:
-        bid = "aw-watcher-window_erb-laptop2-arch"
-        return awc.get_events(bid, start=datetime.now() - timedelta(days=120), limit=-1)
+    RETURN = [events, events_web];
+
+
+def get_events() -> List[Event]:
+    awc = ActivityWatchClient("test", testing=True)
+
+    import inspect
+    query = "\n".join(inspect.getsource(query_func).split("\n")[1:])
+    print(query)
+
+    result = awc.query(query, start=datetime.now() - timedelta(days=1), end=datetime.now())
+    events = [Event(**e) for e in result[0][0] + result[0][1]]
+    return events
 
 
 def test_hostname():

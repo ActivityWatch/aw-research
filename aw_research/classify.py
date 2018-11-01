@@ -87,9 +87,28 @@ def time_per_category_with_flooding(events):
     return c
 
 
-def get_events(bid):
-    return ActivityWatchClient("test", testing=True) \
-        .get_events(bid, start=datetime.now() - timedelta(days=180), limit=-1)
+def get_events() -> List[Event]:
+    awc = ActivityWatchClient("test", testing=True)
+    browsernames = ["Chromium"]
+    query = f"""
+    events_window = flood(query_bucket(find_bucket("aw-watcher-window")));
+    events_afk = flood(query_bucket(find_bucket("aw-watcher-afk")));
+    events = filter_period_intersect(events_window, filter_keyvals(events_afk, "status", ["not-afk"]));
+
+    events_web = flood(query_bucket(find_bucket("aw-watcher-web")));
+    events_browser = filter_keyvals(events, "app", {str(browsernames)});
+    events_web = filter_period_intersect(events_web, events_browser);
+
+    RETURN = events;
+    """
+    # TODO: The query method should return a list of events if a single interval is given, not a list with one list for the one interval.
+    new_way = 1
+    if new_way:
+        result = awc.query(query, start=datetime.now() - timedelta(days=30), end=datetime.now())
+        return [Event(**e) for e in result[0]]
+    else:
+        bid = "aw-watcher-window_erb-laptop2-arch"
+        return awc.get_events(bid, start=datetime.now() - timedelta(days=120), limit=-1)
 
 
 def test_hostname():
@@ -100,7 +119,7 @@ def test_hostname():
 def _print_category(events, cat="Uncategorized", n=10):
     print(f"Showing top {n} from category: {cat}")
     events = [e for e in sorted(events, key=lambda e: -e.duration) if cat in e.data["categories"]]
-    print(f"Total time: {sum((e.duration for e in events[1:]), events[0].duration)}")
+    print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
     groups = {k: sum((e.duration for e in v), timedelta(0)) for k, v in pydash.group_by(events, lambda e: e.data['title']).items()}
     for k, v in list(sorted(groups.items(), key=lambda g: -g[1]))[:n]:
         print(v, k)
@@ -111,7 +130,6 @@ def _build_argparse(parser):
     summary = subparsers.add_parser('summary')
     category = subparsers.add_parser('cat')
     category.add_argument('category')
-    unclassified = subparsers.add_parser('unclassified')
     return parser
 
 
@@ -123,7 +141,7 @@ def _main(args):
 
     if args.cmd2 in ["summary", 'cat']:
         # TODO: Use a query and filter AFK
-        events = get_events("aw-watcher-window_erb-laptop2-arch")
+        events = get_events()
         print(min(e.timestamp for e in events), max(e.timestamp + e.duration for e in events))
         events = classify(events)
         # pprint([e.data["categories"] for e in classify(events)])

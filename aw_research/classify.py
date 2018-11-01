@@ -103,10 +103,10 @@ def query_func():  # noqa
     events_web = filter_period_intersect(events_web, events_browser)
     events = exclude_keyvals(events, "app", browsernames)
 
-    RETURN = [events, events_web]
+    RETURN = [events, events_web]  # TODO: Use concatenate/eventset union when that lands in query2
 
 
-def get_events() -> List[Event]:
+def get_events(since) -> List[Event]:
     awc = ActivityWatchClient("test", testing=True)
 
     import inspect
@@ -116,9 +116,9 @@ def get_events() -> List[Event]:
     sourcelines = [l.strip() for l in sourcelines]  # remove indentation
     sourcelines = [l for l in sourcelines if l]  # remove blank lines
     query = ";\n".join(sourcelines)
-    print(query)
+    # print(query)
 
-    result = awc.query(query, start=datetime.now() - timedelta(days=3), end=datetime.now())
+    result = awc.query(query, start=since, end=datetime.now())
     events = [Event(**e) for e in result[0][0] + result[0][1]]
     return events
 
@@ -152,9 +152,14 @@ def _main(args):
     # pprint(sorted(duration_pairs, key=lambda p: p[1]))
 
     if args.cmd2 in ["summary", 'cat']:
-        # TODO: Use a query and filter AFK
-        events = get_events()
-        print(min(e.timestamp for e in events), max(e.timestamp + e.duration for e in events))
+        how_far_back = timedelta(days=90)
+        events = get_events(datetime.now() - how_far_back)
+        start = min(e.timestamp for e in events)
+        end = max(e.timestamp + e.duration for e in events)
+        print(f"Start:  {start}")
+        print(f"  End:  {end}")
+        print(f" Span:  {end-start}\n")
+
         events = classify(events)
         # pprint([e.data["categories"] for e in classify(events)])
         if args.cmd2 == "summary":

@@ -90,32 +90,35 @@ def time_per_category_with_flooding(events):
 
 
 # The following function is later turned into a query string through introspection.
-# Because of this, any comment inside the function will break the query (as the query2 language doesn't yet support comments).
 # Fancy logic will obviously not work either.
-# TODO: Make semicolons optional in query2, just like normal Python.
-# TODO: Include more browsers
+# TODO: Combine browser events with
 def query_func():  # noqa
-    browsernames = ["Chromium"];
-    events = flood(query_bucket(find_bucket("aw-watcher-window")));
-    events_afk = flood(query_bucket(find_bucket("aw-watcher-afk")));
-    events = filter_period_intersect(events, filter_keyvals(events_afk, "status", ["not-afk"]));
+    browsernames = ["Chromium"]  # TODO: Include more browsers
+    events = flood(query_bucket(find_bucket("aw-watcher-window")))
+    events_afk = flood(query_bucket(find_bucket("aw-watcher-afk")))
+    events = filter_period_intersect(events, filter_keyvals(events_afk, "status", ["not-afk"]))
 
-    events_web = flood(query_bucket(find_bucket("aw-watcher-web")));
-    events_browser = filter_keyvals(events, "app", browsernames);
-    events_web = filter_period_intersect(events_web, events_browser);
-    events = exclude_keyvals(events, "app", browsernames);
+    events_web = flood(query_bucket(find_bucket("aw-watcher-web")))
+    events_browser = filter_keyvals(events, "app", browsernames)
+    events_web = filter_period_intersect(events_web, events_browser)
+    events = exclude_keyvals(events, "app", browsernames)
 
-    RETURN = [events, events_web];
+    RETURN = [events, events_web]
 
 
 def get_events() -> List[Event]:
     awc = ActivityWatchClient("test", testing=True)
 
     import inspect
-    query = "\n".join(inspect.getsource(query_func).split("\n")[1:])
+    sourcelines = inspect.getsource(query_func).split("\n")
+    sourcelines = sourcelines[1:]  # remove function definition
+    sourcelines = [l.split("#")[0] for l in sourcelines]  # remove comments (as query2 doesn't yet support them)
+    sourcelines = [l.strip() for l in sourcelines]  # remove indentation
+    sourcelines = [l for l in sourcelines if l]  # remove blank lines
+    query = ";\n".join(sourcelines)
     print(query)
 
-    result = awc.query(query, start=datetime.now() - timedelta(days=1), end=datetime.now())
+    result = awc.query(query, start=datetime.now() - timedelta(days=3), end=datetime.now())
     events = [Event(**e) for e in result[0][0] + result[0][1]]
     return events
 

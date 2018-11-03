@@ -91,19 +91,25 @@ def time_per_category_with_flooding(events):
 
 # The following function is later turned into a query string through introspection.
 # Fancy logic will obviously not work either.
-# TODO: Combine browser events with
 def query_func():  # noqa
     browsernames = ["Chromium"]  # TODO: Include more browsers
     events = flood(query_bucket(find_bucket("aw-watcher-window")))
-    events_afk = flood(query_bucket(find_bucket("aw-watcher-afk")))
-    events = filter_period_intersect(events, filter_keyvals(events_afk, "status", ["not-afk"]))
-
     events_web = flood(query_bucket(find_bucket("aw-watcher-web")))
+    events_afk = flood(query_bucket(find_bucket("aw-watcher-afk")))
+
+    # Combine window events with web events
     events_browser = filter_keyvals(events, "app", browsernames)
     events_web = filter_period_intersect(events_web, events_browser)
     events = exclude_keyvals(events, "app", browsernames)
+    events = concat(events, events_web)
 
-    RETURN = [events, events_web]  # TODO: Use concatenate/eventset union when that lands in query2
+    # Filter away non-afk and non-audible time
+    events_notafk = filter_keyvals(events_afk, "status", ["not-afk"])
+    events_audible = filter_keyvals(events_web, "audible", [True])
+    events_active = period_union(events_notafk, events_audible)
+    events = filter_period_intersect(events, events_active)
+
+    RETURN = events
 
 
 def get_events(since) -> List[Event]:
@@ -119,7 +125,16 @@ def get_events(since) -> List[Event]:
     # print(query)
 
     result = awc.query(query, start=since, end=datetime.now())
-    events = [Event(**e) for e in result[0][0] + result[0][1]]
+    events = [Event(**e) for e in result[0]]
+
+    from urllib.parse import urlparse
+    for event in events:
+        if 'app' not in event.data:
+            if 'url' in event.data:
+                event.data['app'] = urlparse(event.data['url']).netloc
+            else:
+                print('Unexpected event: ', event)
+
     return events
 
 
@@ -132,9 +147,9 @@ def _print_category(events, cat="Uncategorized", n=10):
     print(f"Showing top {n} from category: {cat}")
     events = [e for e in sorted(events, key=lambda e: -e.duration) if cat in e.data["categories"]]
     print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
-    groups = {k: sum((e.duration for e in v), timedelta(0)) for k, v in pydash.group_by(events, lambda e: e.data['title']).items()}
-    for k, v in list(sorted(groups.items(), key=lambda g: -g[1]))[:n]:
-        print(v, k)
+    groups = {k: (v[0].data, sum((e.duration for e in v), timedelta(0))) for k, v in pydash.group_by(events, lambda e: e.data['title']).items()}
+    for k, (v, duration) in list(sorted(groups.items(), key=lambda g: -g[1][1]))[:n]:
+        print(str(duration).split(".")[0], f"{v['title'][:60]} [{v['app']}]")
 
 
 def _build_argparse(parser):
@@ -152,7 +167,7 @@ def _main(args):
     # pprint(sorted(duration_pairs, key=lambda p: p[1]))
 
     if args.cmd2 in ["summary", 'cat']:
-        how_far_back = timedelta(days=90)
+        how_far_back = timedelta(days=7)
         events = get_events(datetime.now() - how_far_back)
         start = min(e.timestamp for e in events)
         end = max(e.timestamp + e.duration for e in events)

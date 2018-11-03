@@ -79,13 +79,11 @@ def time_per_category(events):
     return c
 
 
-def time_per_category_with_flooding(events):
-    cats = {cat for e in events for cat in e.data["categories"]}
+def time_per_app(events):
     c = Counter()
-    for cat in cats:
-        events_with_cat = [e for e in events if cat in e.data["categories"]]
-        events_with_cat_flooded = flood(events_with_cat, pulsetime=60)
-        c[cat] += sum(e.duration.total_seconds() for e in events_with_cat_flooded)
+    for e in events:
+        if "app" in e.data:
+            c[e.data["app"]] += e.duration.total_seconds()
     return c
 
 
@@ -155,9 +153,18 @@ def _print_category(events, cat="Uncategorized", n=10):
 def _build_argparse(parser):
     subparsers = parser.add_subparsers(dest='cmd2')
     summary = subparsers.add_parser('summary')
+    apps = subparsers.add_parser('apps')
     category = subparsers.add_parser('cat')
     category.add_argument('category')
     return parser
+
+
+def pprint_secs_hhmmss(seconds):
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return ((f"{int(hours)}h".rjust(4) if hours else '').ljust(5) +
+            (f"{int(minutes)}m".rjust(3) if minutes else '').ljust(4) +
+            (f"{int(seconds)}s".rjust(3)))
 
 
 def _main(args):
@@ -166,7 +173,7 @@ def _main(args):
     # duration_pairs = pydash.to_pairs(duration_of_groups(groups))
     # pprint(sorted(duration_pairs, key=lambda p: p[1]))
 
-    if args.cmd2 in ["summary", 'cat']:
+    if args.cmd2 in ["summary", "apps", "cat"]:
         how_far_back = timedelta(days=7)
         events = get_events(datetime.now() - how_far_back)
         start = min(e.timestamp for e in events)
@@ -177,15 +184,14 @@ def _main(args):
 
         events = classify(events)
         # pprint([e.data["categories"] for e in classify(events)])
-        if args.cmd2 == "summary":
+        if args.cmd2 in ["summary", "apps"]:
             print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
-            time_per_cat = time_per_category_with_flooding(events)
-            for c, s in time_per_cat.most_common():
-                hours, remainder = divmod(s, 3600)
-                minutes, seconds = divmod(remainder, 60)
-                print((f"{int(hours)}h".rjust(4) if hours else '').ljust(5) +
-                      (f"{int(minutes)}m".rjust(3) if minutes else '').ljust(4) +
-                      (f"{int(seconds)}s".rjust(3) + f"    {c}"))
+            if args.cmd2 == "summary":
+                time_per = time_per_category(events)
+            elif args.cmd2 == "apps":
+                time_per = time_per_app(events)
+            for c, s in time_per.most_common():
+                print(pprint_secs_hhmmss(s) + f"    {c}")
         elif args.cmd2 == "cat":
             _print_category(events, args.category, 30)
     else:

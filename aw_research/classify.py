@@ -64,13 +64,6 @@ def classify(events):
         if not e.data["$tags"]:
             e.data["$tags"].add("Uncategorized")
 
-    for e in events:
-        for main_cat in ['ActivityWatch', 'Entertainment', 'Uncategorized']:
-            if main_cat in e.data['$tags']:
-                e.data['main_category'] = [main_cat]
-        if 'main_category' not in e.data:
-            e.data['main_category'] = ['No main: ' + list(e.data['$tags'])[0]]
-
     return events
 
 

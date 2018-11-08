@@ -1,3 +1,8 @@
+# TODO
+# Replace current redact method with:
+#  1. tag (classify.py)
+#  2. redact by tag
+
 import re
 import logging
 from typing import List, Callable, Tuple

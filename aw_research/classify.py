@@ -33,17 +33,22 @@ def get_parent_categories(cat: str) -> set:
     return set()
 
 
-def get_parent_categories_hier(cat: str) -> str:
+def build_category_hierarchy(cat: str, app: str = None) -> str:
+    # Recursive
     s = cat
     if cat in parent_categories:
         parent = parent_categories[cat]
-        parents_of_parent = get_parent_categories_hier(parent)
+        parents_of_parent = build_category_hierarchy(parent)
         if parents_of_parent:
             s = parents_of_parent + " -> " + s
+    if app:
+        app = app.lstrip("www.").rstrip(".com")
+        if app.lower() not in s.lower():
+            s = s + " -> " + app
     return s
 
 
-def classify(events):
+def classify(events, include_app=False):
     for event in events:
         event.data["$tags"] = set()
         event.data["$category_hierarchy"] = "Uncategorized"
@@ -56,7 +61,8 @@ def classify(events):
                     continue
                 if cat not in event.data["$tags"] and \
                    r.findall(event.data[attr]):
-                    event.data["$category_hierarchy"] = get_parent_categories_hier(cat)
+                    app = event.data['app'] if include_app and 'app' in event.data else None
+                    event.data["$category_hierarchy"] = build_category_hierarchy(cat, app=app)
                     event.data["$tags"].add(cat)
                     event.data["$tags"] |= get_parent_categories(cat)
 

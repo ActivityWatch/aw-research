@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Set, Optional, Tuple
 from urllib.parse import urlparse
 from collections import Counter
 from datetime import datetime, timedelta
@@ -11,15 +11,16 @@ from aw_client import ActivityWatchClient
 
 import pydash
 
+from .plot_sunburst import sunburst
 
-def read_csv_mapping(filename) -> Dict[str, str]:
+
+def read_class_csv(filename) -> List[Tuple[str, ...]]:
     with open(filename) as f:
-        lines = [tuple(line.strip().split(";")[:2]) for line in f.readlines() if line.strip() and not line.startswith("#")]
-        return dict(lines)
+        return [(*line.strip().split(";"), '')[:3] for line in f.readlines() if line.strip() and not line.startswith("#")]
 
 
-classes = read_csv_mapping('category_regexes.csv')
-parent_categories = read_csv_mapping('parent_categories.csv')
+classes = read_class_csv('category_regexes.csv')
+parent_categories = {tag: parent for _, tag, parent in classes}
 
 
 def get_parent_categories(cat: str) -> set:
@@ -32,24 +33,43 @@ def get_parent_categories(cat: str) -> set:
     return set()
 
 
+def get_parent_categories_hier(cat: str) -> str:
+    s = cat
+    if cat in parent_categories:
+        parent = parent_categories[cat]
+        parents_of_parent = get_parent_categories_hier(parent)
+        if parents_of_parent:
+            s = parents_of_parent + " -> " + s
+    return s
+
+
 def classify(events):
     for event in events:
-        event.data["categories"] = set()
+        event.data["$tags"] = set()
+        event.data["$category_hierarchy"] = "Uncategorized"
 
-    for re_pattern, cat in classes.items():
+    for re_pattern, cat, _ in classes:
         r = re.compile(re_pattern)
         for event in events:
-            for attr in ["title", "app"]:
+            for attr in ["title", "app", "url"]:
                 if attr not in event.data:
                     continue
-                if cat not in event.data["categories"] and \
+                if cat not in event.data["$tags"] and \
                    r.findall(event.data[attr]):
-                    event.data["categories"].add(cat)
-                    event.data["categories"] |= get_parent_categories(cat)
+                    event.data["$category_hierarchy"] = get_parent_categories_hier(cat)
+                    event.data["$tags"].add(cat)
+                    event.data["$tags"] |= get_parent_categories(cat)
 
     for e in events:
-        if not e.data["categories"]:
-            e.data["categories"].add("Uncategorized")
+        if not e.data["$tags"]:
+            e.data["$tags"].add("Uncategorized")
+
+    for e in events:
+        for main_cat in ['ActivityWatch', 'Entertainment', 'Uncategorized']:
+            if main_cat in e.data['$tags']:
+                e.data['main_category'] = [main_cat]
+        if 'main_category' not in e.data:
+            e.data['main_category'] = ['No main: ' + list(e.data['$tags'])[0]]
 
     return events
 
@@ -70,13 +90,45 @@ def duration_of_groups(groups: Dict[Any, List[Event]]):
         groups_eventdurations, lambda g: pydash.reduce_(g, lambda total, d: total + d))
 
 
-def time_per_category(events):
+def unfold_hier(s: str) -> List[str]:
+    cats = s.split(" -> ")
+    cats_s = []
+    for i in range(1, len(cats) + 1):
+        cats_s.append(" -> ".join(cats[:i]))
+    return cats_s
+
+
+def time_per_category(events, unfold=True):
     c = Counter()
     for e in events:
-        cats = e.data["categories"]
+        if unfold:
+            cats = unfold_hier(e.data["$category_hierarchy"])
+        else:
+            cats = [e.data["$category_hierarchy"]]
         for cat in cats:
             c[cat] += e.duration.total_seconds()
     return c
+
+
+def plot_category_hierarchy_sunburst(events):
+    counter = time_per_category(events, unfold=False)
+    data = {}
+    for cat in counter:
+        cat_levels = cat.split(" -> ")
+        level = data
+        for c in cat_levels:
+            if c not in level:
+                level[c] = {"time": 0, "subcats": {}}
+            level[c]["time"] += counter[cat]
+            level = level[c]["subcats"]
+
+    def dict_hier_to_list_hier(d):
+        return sorted([(k, v['time'], dict_hier_to_list_hier(v['subcats'])) for k, v in d.items()], key=lambda t: -t[1])
+    data = dict_hier_to_list_hier(data)
+
+    sunburst(data, total=sum(t[1] for t in data))
+    import matplotlib.pyplot as plt
+    plt.show()
 
 
 def time_per_app(events):
@@ -133,6 +185,7 @@ def get_events(since) -> List[Event]:
             else:
                 print('Unexpected event: ', event)
 
+    events = [e for e in events if e.data]
     return events
 
 
@@ -143,9 +196,9 @@ def test_hostname():
 
 def _print_category(events, cat="Uncategorized", n=10):
     print(f"Showing top {n} from category: {cat}")
-    events = [e for e in sorted(events, key=lambda e: -e.duration) if cat in e.data["categories"]]
+    events = [e for e in sorted(events, key=lambda e: -e.duration) if cat in e.data["$tags"]]
     print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
-    groups = {k: (v[0].data, sum((e.duration for e in v), timedelta(0))) for k, v in pydash.group_by(events, lambda e: e.data['title']).items()}
+    groups = {k: (v[0].data, sum((e.duration for e in v), timedelta(0))) for k, v in pydash.group_by(events, lambda e: e.data.get('title', "unknown")).items()}
     for k, (v, duration) in list(sorted(groups.items(), key=lambda g: -g[1][1]))[:n]:
         print(str(duration).split(".")[0], f"{v['title'][:60]} [{v['app']}]")
 
@@ -153,6 +206,7 @@ def _print_category(events, cat="Uncategorized", n=10):
 def _build_argparse(parser):
     subparsers = parser.add_subparsers(dest='cmd2')
     summary = subparsers.add_parser('summary')
+    summary_plot = subparsers.add_parser('summary_plot')
     apps = subparsers.add_parser('apps')
     category = subparsers.add_parser('cat')
     category.add_argument('category')
@@ -173,7 +227,7 @@ def _main(args):
     # duration_pairs = pydash.to_pairs(duration_of_groups(groups))
     # pprint(sorted(duration_pairs, key=lambda p: p[1]))
 
-    if args.cmd2 in ["summary", "apps", "cat"]:
+    if args.cmd2 in ["summary", "summary_plot", "apps", "cat"]:
         how_far_back = timedelta(days=7)
         events = get_events(datetime.now() - how_far_back)
         start = min(e.timestamp for e in events)
@@ -183,7 +237,7 @@ def _main(args):
         print(f" Span:  {end-start}\n")
 
         events = classify(events)
-        # pprint([e.data["categories"] for e in classify(events)])
+        # pprint([e.data["$tags"] for e in classify(events)])
         if args.cmd2 in ["summary", "apps"]:
             print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
             if args.cmd2 == "summary":
@@ -194,6 +248,8 @@ def _main(args):
                 print(pprint_secs_hhmmss(s) + f"    {c}")
         elif args.cmd2 == "cat":
             _print_category(events, args.category, 30)
+        elif args.cmd2 == "summary_plot":
+            plot_category_hierarchy_sunburst(events)
     else:
         print(f'unknown subcommand to classify: {args.cmd2}')
 
@@ -201,5 +257,4 @@ def _main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='')
     parser = _build_argparse(parser)
-    args = parser.parse_args()
-    _main(args)
+    _main(parser.parse_args())

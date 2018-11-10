@@ -127,6 +127,7 @@ def plot_category_hierarchy_sunburst(events):
 
     sunburst(data, total=sum(t[1] for t in data))
     import matplotlib.pyplot as plt
+    plt.subplots_adjust(0, 0, 1, 1)
     plt.show()
 
 
@@ -161,7 +162,28 @@ def query_func():  # noqa
     RETURN = events
 
 
-def get_events(since) -> List[Event]:
+def _get_events_smartertime(since) -> List[Event]:
+    import json
+    with open('data/private/smartertime_export_2018-11-10_bf03574a.awbucket.json') as f:
+        data = json.load(f)
+        events = [Event(**e) for e in data['events']]
+
+    # Filter out events before `since`
+    from datetime import timezone
+    events = [e for e in events if since.astimezone(timezone.utc) < e.timestamp]
+
+    # Filter out no-events and non-phone events
+    events = [e for e in events if any(s in e.data['activity'] for s in ['phone:', 'call:'])]
+
+    # Normalize to window-bucket data schema
+    for e in events:
+        e.data['app'] = e.data['activity']
+        e.data['title'] = e.data['app']
+
+    return events
+
+
+def get_events(since, include_smartertime=False) -> List[Event]:
     awc = ActivityWatchClient("test", testing=True)
 
     import inspect
@@ -175,6 +197,13 @@ def get_events(since) -> List[Event]:
 
     result = awc.query(query, start=since, end=datetime.now())
     events = [Event(**e) for e in result[0]]
+
+    if include_smartertime:
+        events += _get_events_smartertime(since)
+        events = sorted(events, key=lambda e: e.timestamp)
+
+    # Filter out events without data (which sometimes happens for whatever reason)
+    events = [e for e in events if e.data]
 
     from urllib.parse import urlparse
     for event in events:
@@ -227,13 +256,18 @@ def _main(args):
     # pprint(sorted(duration_pairs, key=lambda p: p[1]))
 
     if args.cmd2 in ["summary", "summary_plot", "apps", "cat"]:
-        how_far_back = timedelta(days=7)
+        how_far_back = timedelta(hours=1 * 24)
         events = get_events(datetime.now() - how_far_back)
         start = min(e.timestamp for e in events)
         end = max(e.timestamp + e.duration for e in events)
-        print(f"Start:  {start}")
-        print(f"  End:  {end}")
-        print(f" Span:  {end-start}\n")
+        duration = sum((e.duration for e in events), timedelta(0))
+        coverage = duration / (end - start)
+        print(f"    Start:  {start}")
+        print(f"      End:  {end}")
+        print(f"     Span:  {end-start}")
+        print(f" Duration:  {duration}")
+        print(f" Coverage:  {round(100 * coverage)}%")
+        print()
 
         events = classify(events)
         # pprint([e.data["$tags"] for e in classify(events)])

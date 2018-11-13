@@ -1,18 +1,20 @@
-from typing import List, Dict, Any, Optional, Tuple
+import typing
+from typing import List, Dict, Optional, Tuple, Set
+
+import argparse
+import re
 from urllib.parse import urlparse
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from copy import deepcopy
-import argparse
-import re
+
+import pytz
+import pydash
 
 from aw_core.models import Event
 from aw_core.timeperiod import TimePeriod
 from aw_transform import flood, filter_period_intersect
 from aw_client import ActivityWatchClient
-
-import pytz
-import pydash
 
 from .plot_sunburst import sunburst
 
@@ -26,7 +28,7 @@ classes = read_class_csv('category_regexes.csv')
 parent_categories = {tag: parent for _, tag, parent in classes}
 
 
-def get_parent_categories(cat: str) -> set:
+def get_parent_categories(cat: str) -> Set[str]:
     # Recursive
     if cat in parent_categories:
         cats = {parent_categories[cat]}
@@ -51,7 +53,7 @@ def build_category_hierarchy(cat: str, app: str = None) -> str:
     return s
 
 
-def classify(events, include_app=False):
+def classify(events: List[Event], include_app=False) -> List[Event]:
     for event in events:
         event.data["$tags"] = set()
         event.data["$category_hierarchy"] = "Uncategorized"
@@ -76,20 +78,12 @@ def classify(events, include_app=False):
     return events
 
 
-def _hostname(url):
+def _hostname(url: str) -> str:
     return urlparse(url).netloc
 
 
-def group_by_url_hostname(events):
+def group_by_url_hostname(events: List[Event]) -> Dict[str, List[Event]]:
     return pydash.group_by(events, lambda e: _hostname(e.data["url"]))
-
-
-def duration_of_groups(groups: Dict[Any, List[Event]]):
-    groups_eventdurations = pydash.map_values(
-        groups, lambda g: pydash.map_(g, lambda e: e.duration.total_seconds()))  # type: Dict[Any, float]
-
-    return pydash.map_values(
-        groups_eventdurations, lambda g: pydash.reduce_(g, lambda total, d: total + d))
 
 
 def unfold_hier(s: str) -> List[str]:
@@ -100,8 +94,8 @@ def unfold_hier(s: str) -> List[str]:
     return cats_s
 
 
-def time_per_category(events, unfold=True):
-    c = Counter()
+def time_per_category(events: List[Event], unfold=True) -> typing.Counter[str]:
+    c: typing.Counter[str] = Counter()
     for e in events:
         if unfold:
             cats = unfold_hier(e.data["$category_hierarchy"])
@@ -310,7 +304,7 @@ def test_union_no_overlap():
     assert dur == timedelta(hours=5, minutes=0)
 
 
-def get_events(since, include_smartertime=True, include_toggl=True) -> List[Event]:
+def get_events(since: datetime, include_smartertime=True, include_toggl=True) -> List[Event]:
     awc = ActivityWatchClient("test", testing=True)
 
     import inspect

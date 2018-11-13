@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Set, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple
 from urllib.parse import urlparse
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -252,13 +252,7 @@ def _union_no_overlap(events1, events2):
       events1  |  ----     ------   -- |
       result   | xxx--  xx ----xxx  -- |
     """
-
     # TODO: Move to aw-transform
-    # events_union = deepcopy(events1)
-    # for e1 in events_union:
-    #     for e2 in events2:
-    #         if e1.intersects(e2):
-    #             e1
 
     events1 = deepcopy(events1)
     events2 = deepcopy(events2)
@@ -267,7 +261,6 @@ def _union_no_overlap(events1, events2):
     events_union = []
     e1_i = 0
     e2_i = 0
-    # print('new run')
     while e1_i < len(events1) and e2_i < len(events2):
         e1 = events1[e1_i]
         e2 = events2[e2_i]
@@ -283,23 +276,19 @@ def _union_no_overlap(events1, events2):
                 else:
                     e2_i += 1
                 e1_i += 1
-                # print('next e1 (a)')
             else:
                 e2_next, e2_next2 = _split_event(e2, e1.timestamp)
                 events_union.append(e2_next)
                 e2_i += 1
-                # print('next e2 (a)')
                 if e2_next2:
-                     events2.insert(e2_i, e2_next2)
+                    events2.insert(e2_i, e2_next2)
         else:
             if e1.timestamp < e2.timestamp:
                 events_union.append(e1)
                 e1_i += 1
-                # print('next e1 (b)')
             else:
                 events_union.append(e2)
                 e2_i += 1
-                # print('next e2 (b)')
     events_union += events1[e1_i:]
     events_union += events2[e2_i:]
     return events_union
@@ -357,11 +346,6 @@ def get_events(since, include_smartertime=True, include_toggl=True) -> List[Even
     # Filter out events without data (which sometimes happens for whatever reason)
     events = [e for e in events if e.data]
 
-    # for e in events:
-    #     if 'Project' in e.data:
-    #         print(e)
-
-    from urllib.parse import urlparse
     for event in events:
         if 'app' not in event.data:
             if 'url' in event.data:
@@ -383,17 +367,16 @@ def _print_category(events, cat="Uncategorized", n=10):
     events = [e for e in sorted(events, key=lambda e: -e.duration) if cat in e.data["$tags"]]
     print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")
     groups = {k: (v[0].data, sum((e.duration for e in v), timedelta(0))) for k, v in pydash.group_by(events, lambda e: e.data.get('title', "unknown")).items()}
-    for k, (v, duration) in list(sorted(groups.items(), key=lambda g: -g[1][1]))[:n]:
+    for _, (v, duration) in list(sorted(groups.items(), key=lambda g: -g[1][1]))[:n]:
         print(str(duration).split(".")[0], f"{v['title'][:60]} [{v['app']}]")
 
 
 def _build_argparse(parser):
     subparsers = parser.add_subparsers(dest='cmd2')
-    summary = subparsers.add_parser('summary')
-    summary_plot = subparsers.add_parser('summary_plot')
-    apps = subparsers.add_parser('apps')
-    category = subparsers.add_parser('cat')
-    category.add_argument('category')
+    subparsers.add_parser('summary')
+    subparsers.add_parser('summary_plot')
+    subparsers.add_parser('apps')
+    subparsers.add_parser('cat').add_argument('category')
     return parser
 
 
@@ -444,6 +427,6 @@ def _main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='')
-    parser = _build_argparse(parser)
-    _main(parser.parse_args())
+    _parser = argparse.ArgumentParser(description='')
+    _parser = _build_argparse(_parser)
+    _main(_parser.parse_args())

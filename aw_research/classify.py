@@ -234,16 +234,6 @@ def test_split_event():
     assert e2.duration == td1h
 
 
-# Unused
-def _join_events_no_overlap(e1, e2):
-    if e1.intersects(e2):
-        e1_1, e1_2 = _split_event(e1, e2.timestamp)
-        _, e1_2 = _split_event(e1_2, e2.timestamp + e2.duration)
-        return [e1_1, e2, e1_2]
-    else:
-        return [e1, e2]
-
-
 def _union_no_overlap(events1, events2):
     """Merges two eventlists and removes overlap, the first eventlist will have precedence
 
@@ -330,7 +320,6 @@ def get_events(since, include_smartertime=True, include_toggl=True) -> List[Even
     sourcelines = [l.strip() for l in sourcelines]  # remove indentation
     sourcelines = [l for l in sourcelines if l]  # remove blank lines
     query = ";\n".join(sourcelines)
-    # print(query)
 
     result = awc.query(query, start=since, end=datetime.now())
     events = [Event(**e) for e in result[0]]
@@ -389,13 +378,8 @@ def pprint_secs_hhmmss(seconds):
 
 
 def _main(args):
-    # events = get_events("aw-watcher-web-chrome")
-    # groups = group_by_url_hostname(events)
-    # duration_pairs = pydash.to_pairs(duration_of_groups(groups))
-    # pprint(sorted(duration_pairs, key=lambda p: p[1]))
-
     if args.cmd2 in ["summary", "summary_plot", "apps", "cat"]:
-        how_far_back = timedelta(hours=30 * 24)
+        how_far_back = timedelta(hours=1 * 12)
         events = get_events(datetime.now() - how_far_back)
         start = min(e.timestamp for e in events)
         end = max(e.timestamp + e.duration for e in events)

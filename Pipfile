@@ -13,6 +13,8 @@ algorithmia = "*"
 google-api-python-client = "*"
 calmap = "*"
 "iso8601" = "*"
+pandas = "*"
+pytz = "*"
 
 [dev-packages]
 pydash = "*"

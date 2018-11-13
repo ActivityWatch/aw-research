@@ -1,14 +1,17 @@
 from typing import List, Dict, Any, Set, Optional, Tuple
 from urllib.parse import urlparse
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from copy import deepcopy
 import argparse
 import re
 
 from aw_core.models import Event
-from aw_transform import flood
+from aw_core.timeperiod import TimePeriod
+from aw_transform import flood, filter_period_intersect
 from aw_client import ActivityWatchClient
 
+import pytz
 import pydash
 
 from .plot_sunburst import sunburst
@@ -162,6 +165,32 @@ def query_func():  # noqa
     RETURN = events
 
 
+def _get_events_toggl(since) -> List[Event]:
+    with open('./data/private/Toggl_time_entries_2017-12-17_to_2018-11-11.csv', 'r', encoding='utf-8-sig') as f:
+        lines = f.readlines()
+        rows = [l.strip().split(',') for l in lines]
+        header = rows[0]
+        rows = rows[1:]
+        entries: List[Dict] = [{'data': dict(zip(header, row))} for row in rows]
+        for e in entries:
+            for s in ['Start', 'End']:
+                yyyy, mm, dd = map(int, e['data'].pop(f'{s} date').split("-"))
+                HH, MM, SS = map(int, e['data'].pop(f'{s} time').split(':'))
+                e['data'][s] = datetime(yyyy, mm, dd, HH, MM, SS).astimezone(pytz.timezone('Europe/Stockholm'))
+            e['timestamp'] = e['data'].pop('Start')
+            e['duration'] = e['data'].pop('End') - e['timestamp']
+            del e['data']['User']
+            del e['data']['Email']
+            del e['data']['Duration']
+
+            e['data']['app'] = e['data']['Project']
+            e['data']['title'] = e['data']['Description']
+
+    events = [Event(**e) for e in entries]
+    events = [e for e in events if since.astimezone(timezone.utc) < e.timestamp]
+    return events
+
+
 def _get_events_smartertime(since) -> List[Event]:
     import json
     with open('data/private/smartertime_export_2018-11-10_bf03574a.awbucket.json') as f:
@@ -169,7 +198,6 @@ def _get_events_smartertime(since) -> List[Event]:
         events = [Event(**e) for e in data['events']]
 
     # Filter out events before `since`
-    from datetime import timezone
     events = [e for e in events if since.astimezone(timezone.utc) < e.timestamp]
 
     # Filter out no-events and non-phone events
@@ -183,7 +211,127 @@ def _get_events_smartertime(since) -> List[Event]:
     return events
 
 
-def get_events(since, include_smartertime=False) -> List[Event]:
+def _split_event(e: Event, dt: datetime) -> Tuple[Event, Optional[Event]]:
+    if e.timestamp < dt < e.timestamp + e.duration:
+        e1 = deepcopy(e)
+        e2 = deepcopy(e)
+        e1.duration = dt - e.timestamp
+        e2.timestamp = dt
+        e2.duration = (e.timestamp + e.duration) - dt
+        return (e1, e2)
+    else:
+        return (e, None)
+
+
+def test_split_event():
+    now = datetime(2018, 1, 1, 0, 0).astimezone(timezone.utc)
+    td1h = timedelta(hours=1)
+    e = Event(timestamp=now, duration=2 * td1h, data={})
+    e1, e2 = _split_event(e, now + td1h)
+    assert e1.timestamp == now
+    assert e1.duration == td1h
+    assert e2.timestamp == now + td1h
+    assert e2.duration == td1h
+
+
+# Unused
+def _join_events_no_overlap(e1, e2):
+    if e1.intersects(e2):
+        e1_1, e1_2 = _split_event(e1, e2.timestamp)
+        _, e1_2 = _split_event(e1_2, e2.timestamp + e2.duration)
+        return [e1_1, e2, e1_2]
+    else:
+        return [e1, e2]
+
+
+def _union_no_overlap(events1, events2):
+    """Merges two eventlists and removes overlap, the first eventlist will have precedence
+
+    Example:
+      events1  | xxx    xx     xxx     |
+      events1  |  ----     ------   -- |
+      result   | xxx--  xx ----xxx  -- |
+    """
+
+    # TODO: Move to aw-transform
+    # events_union = deepcopy(events1)
+    # for e1 in events_union:
+    #     for e2 in events2:
+    #         if e1.intersects(e2):
+    #             e1
+
+    events1 = deepcopy(events1)
+    events2 = deepcopy(events2)
+
+    # I looked a lot at aw_transform.union when I wrote this
+    events_union = []
+    e1_i = 0
+    e2_i = 0
+    # print('new run')
+    while e1_i < len(events1) and e2_i < len(events2):
+        e1 = events1[e1_i]
+        e2 = events2[e2_i]
+        e1_p = TimePeriod(e1.timestamp, e1.timestamp + e1.duration)
+        e2_p = TimePeriod(e2.timestamp, e2.timestamp + e2.duration)
+
+        if e1_p.intersects(e2_p):
+            if e1.timestamp <= e2.timestamp:
+                events_union.append(e1)
+                _, e2_next = _split_event(e2, e1.timestamp + e1.duration)
+                if e2_next:
+                    events2[e2_i] = e2_next
+                else:
+                    e2_i += 1
+                e1_i += 1
+                # print('next e1 (a)')
+            else:
+                e2_next, e2_next2 = _split_event(e2, e1.timestamp)
+                events_union.append(e2_next)
+                e2_i += 1
+                # print('next e2 (a)')
+                if e2_next2:
+                     events2.insert(e2_i, e2_next2)
+        else:
+            if e1.timestamp < e2.timestamp:
+                events_union.append(e1)
+                e1_i += 1
+                # print('next e1 (b)')
+            else:
+                events_union.append(e2)
+                e2_i += 1
+                # print('next e2 (b)')
+    events_union += events1[e1_i:]
+    events_union += events2[e2_i:]
+    return events_union
+
+
+def test_union_no_overlap():
+    from pprint import pprint
+
+    now = datetime(2018, 1, 1, 0, 0)
+    td1h = timedelta(hours=1)
+    events1 = [Event(timestamp=now + 2 * i * td1h, duration=td1h, data={'test': 1}) for i in range(3)]
+    events2 = [Event(timestamp=now + (2 * i + 0.5) * td1h, duration=td1h, data={'test': 2}) for i in range(3)]
+
+    events_union = _union_no_overlap(events1, events2)
+    # pprint(events_union)
+    dur = sum((e.duration for e in events_union), timedelta(0))
+    assert dur == timedelta(hours=4, minutes=30)
+
+    events_union = _union_no_overlap(events2, events1)
+    # pprint(events_union)
+    dur = sum((e.duration for e in events_union), timedelta(0))
+    assert dur == timedelta(hours=4, minutes=30)
+
+    events1 = [Event(timestamp=now + (2 * i) * td1h, duration=td1h, data={'test': 1}) for i in range(3)]
+    events2 = [Event(timestamp=now, duration=5 * td1h, data={'test': 2})]
+    events_union = _union_no_overlap(events1, events2)
+    pprint(events_union)
+    dur = sum((e.duration for e in events_union), timedelta(0))
+    assert dur == timedelta(hours=5, minutes=0)
+
+
+def get_events(since, include_smartertime=True, include_toggl=True) -> List[Event]:
     awc = ActivityWatchClient("test", testing=True)
 
     import inspect
@@ -199,11 +347,19 @@ def get_events(since, include_smartertime=False) -> List[Event]:
     events = [Event(**e) for e in result[0]]
 
     if include_smartertime:
-        events += _get_events_smartertime(since)
+        events = _union_no_overlap(events, _get_events_smartertime(since))
+        events = sorted(events, key=lambda e: e.timestamp)
+
+    if include_toggl:
+        events = _union_no_overlap(events, _get_events_toggl(since))
         events = sorted(events, key=lambda e: e.timestamp)
 
     # Filter out events without data (which sometimes happens for whatever reason)
     events = [e for e in events if e.data]
+
+    # for e in events:
+    #     if 'Project' in e.data:
+    #         print(e)
 
     from urllib.parse import urlparse
     for event in events:
@@ -256,7 +412,7 @@ def _main(args):
     # pprint(sorted(duration_pairs, key=lambda p: p[1]))
 
     if args.cmd2 in ["summary", "summary_plot", "apps", "cat"]:
-        how_far_back = timedelta(hours=1 * 24)
+        how_far_back = timedelta(hours=30 * 24)
         events = get_events(datetime.now() - how_far_back)
         start = min(e.timestamp for e in events)
         end = max(e.timestamp + e.duration for e in events)
@@ -269,7 +425,7 @@ def _main(args):
         print(f" Coverage:  {round(100 * coverage)}%")
         print()
 
-        events = classify(events)
+        events = classify(events, include_app=False)
         # pprint([e.data["$tags"] for e in classify(events)])
         if args.cmd2 in ["summary", "apps"]:
             print(f"Total time: {sum((e.duration for e in events), timedelta(0))}")

@@ -3,8 +3,8 @@
 build:
 	pipenv install
 
-test: typecheck
-	pipenv run pytest tests/
+test:
+	pipenv run pytest tests/ aw_research/classify.py
 
 test-integration:
 	pipenv run aw_research redact

@@ -4,8 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-aw-research = {editable = true, path = "."}
-aw-client = {editable = true, git = "https://github.com/ActivityWatch/aw-client.git"}
+aw-client = {editable = true,git = "https://github.com/ActivityWatch/aw-client.git"}
 numpy = "*"
 matplotlib = "*"
 pydash = "*"

@@ -3,13 +3,18 @@ from typing import List, Dict, Optional, Tuple, Set
 
 import argparse
 import re
+import json
 from urllib.parse import urlparse
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from copy import deepcopy
+from functools import wraps
 
 import pytz
 import pydash
+import matplotlib.pyplot as plt
+import pandas as pd
+import joblib
 
 from aw_core.models import Event
 from aw_core.timeperiod import TimePeriod
@@ -19,16 +24,42 @@ from aw_client import ActivityWatchClient
 from .plot_sunburst import sunburst
 
 
+memory = joblib.Memory('./.cache/joblib')
+
+
 def read_class_csv(filename) -> List[Tuple[str, ...]]:
     with open(filename) as f:
         return [(*line.strip().split(";"), '')[:3] for line in f.readlines() if line.strip() and not line.startswith("#")]
 
 
-classes = read_class_csv('category_regexes.csv')
-parent_categories = {tag: parent for _, tag, parent in classes}
+classes: Optional[List] = None
+parent_categories: Optional[Dict[str, str]] = None
 
 
+def _init_classes(class_csv_filename=None, new_classes=None):
+    global classes, parent_categories
+    if class_csv_filename:
+        classes = read_class_csv(class_csv_filename)
+    elif new_classes:
+        classes = new_classes
+    else:
+        raise Exception
+    parent_categories = {tag: parent for _, tag, parent in classes}
+
+
+def requires_init_classes(f):
+    @wraps(f)
+    def g(*args, **kwargs):
+        if parent_categories is None:
+            raise Exception('Classes not initialized, run _init_classes first.')
+        return f(*args, **kwargs)
+    return g
+
+
+@requires_init_classes
 def get_parent_categories(cat: str) -> Set[str]:
+    assert parent_categories  # just to quiet typechecker, checked by decorator
+
     # Recursive
     if cat in parent_categories:
         cats = {parent_categories[cat]}
@@ -38,7 +69,10 @@ def get_parent_categories(cat: str) -> Set[str]:
     return set()
 
 
+@requires_init_classes
 def build_category_hierarchy(cat: str, app: str = None) -> str:
+    assert parent_categories  # just to quiet typechecker, checked by decorator
+
     # Recursive
     s = cat
     if cat in parent_categories:
@@ -53,7 +87,13 @@ def build_category_hierarchy(cat: str, app: str = None) -> str:
     return s
 
 
-def classify(events: List[Event], include_app=False) -> List[Event]:
+@requires_init_classes
+def classify(events: List[Event], include_app=False, max_category_depth=3) -> List[Event]:
+    assert classes  # just to quiet typechecker, checked by decorator
+
+    if classes is None:
+        raise Exception('Classes not initialized, run _init_classes first.')
+
     for event in events:
         event.data["$tags"] = set()
         event.data["$category_hierarchy"] = "Uncategorized"
@@ -74,6 +114,10 @@ def classify(events: List[Event], include_app=False) -> List[Event]:
     for e in events:
         if not e.data["$tags"]:
             e.data["$tags"].add("Uncategorized")
+
+    # Restrict maximum category depth
+    for e in events:
+        e.data['$category_hierarchy'] = _restrict_category_depth(e.data["$category_hierarchy"], max_category_depth)
 
     return events
 
@@ -106,7 +150,7 @@ def time_per_category(events: List[Event], unfold=True) -> typing.Counter[str]:
     return c
 
 
-def plot_category_hierarchy_sunburst(events):
+def _plot_category_hierarchy_sunburst(events):
     counter = time_per_category(events, unfold=False)
     data = {}
     for cat in counter:
@@ -123,9 +167,11 @@ def plot_category_hierarchy_sunburst(events):
     data = dict_hier_to_list_hier(data)
 
     sunburst(data, total=sum(t[1] for t in data))
-    import matplotlib.pyplot as plt
     plt.subplots_adjust(0, 0, 1, 1)
-    plt.show()
+
+
+def _restrict_category_depth(s: str, n: int) -> str:
+    return " -> ".join(s.split(" -> ")[:n])
 
 
 def time_per_app(events):
@@ -136,9 +182,24 @@ def time_per_app(events):
     return c
 
 
+def query_func(f):
+    """Decorator for transforming Python functions into query2 strings"""
+    import inspect
+    srclines = inspect.getsource(f).split("\n")
+    srclines = srclines[2:]  # remove decoration and function definition
+    srclines = [l.split("#")[0] for l in srclines]  # remove comments (as query2 doesn't yet support them)
+    srclines = [l.strip() for l in srclines]  # remove indentation
+    srclines = [l for l in srclines if l]  # remove blank lines
+    srclines = [l for l in srclines if not (l.startswith("import") or l.startswith("from"))]  # remove import statements
+    srclines = [l if "return" not in l else l.replace("return", "RETURN = ") for l in srclines]
+    return ";\n".join(srclines)
+
+
 # The following function is later turned into a query string through introspection.
 # Fancy logic will obviously not work either.
-def query_func():  # noqa
+@query_func
+def query_complete():  # noqa
+    from aw_transform import query_bucket, find_bucket, filter_keyvals, exclude_keyvals, period_union, concat
     browsernames = ["Chromium"]  # TODO: Include more browsers
     events = flood(query_bucket(find_bucket("aw-watcher-window")))
     events_web = flood(query_bucket(find_bucket("aw-watcher-web")))
@@ -156,11 +217,11 @@ def query_func():  # noqa
     events_active = period_union(events_notafk, events_audible)
     events = filter_period_intersect(events, events_active)
 
-    RETURN = events
+    return events
 
 
-def _get_events_toggl(since) -> List[Event]:
-    with open('./data/private/Toggl_time_entries_2017-12-17_to_2018-11-11.csv', 'r', encoding='utf-8-sig') as f:
+def _get_events_toggl(since: datetime, filepath: str) -> List[Event]:
+    with open(filepath, 'r', encoding='utf-8-sig') as f:
         lines = f.readlines()
         rows = [l.strip().split(',') for l in lines]
         header = rows[0]
@@ -185,9 +246,13 @@ def _get_events_toggl(since) -> List[Event]:
     return events
 
 
-def _get_events_smartertime(since) -> List[Event]:
-    import json
-    with open('data/private/smartertime_export_2018-11-10_bf03574a.awbucket.json') as f:
+def _get_events_smartertime(since: datetime, filepath: str='auto') -> List[Event]:
+    if filepath == 'auto':
+        from glob import glob
+        filepath = sorted(glob("data/private/smartertime_export_*.awbucket.json"))[-1]
+
+    print(f'Loading smartertime data from {filepath}')
+    with open(filepath) as f:
         data = json.load(f)
         events = [Event(**e) for e in data['events']]
 
@@ -304,27 +369,26 @@ def test_union_no_overlap():
     assert dur == timedelta(hours=5, minutes=0)
 
 
-def get_events(since: datetime, include_smartertime=True, include_toggl=True) -> List[Event]:
+@memory.cache
+def get_events(since: datetime, end: datetime, include_smartertime='auto', include_toggl=None) -> List[Event]:
     awc = ActivityWatchClient("test", testing=True)
 
-    import inspect
-    sourcelines = inspect.getsource(query_func).split("\n")
-    sourcelines = sourcelines[1:]  # remove function definition
-    sourcelines = [l.split("#")[0] for l in sourcelines]  # remove comments (as query2 doesn't yet support them)
-    sourcelines = [l.strip() for l in sourcelines]  # remove indentation
-    sourcelines = [l for l in sourcelines if l]  # remove blank lines
-    query = ";\n".join(sourcelines)
-
-    result = awc.query(query, start=since, end=datetime.now())
+    # print(query_complete)
+    result = awc.query(query_complete, start=since, end=end)
     events = [Event(**e) for e in result[0]]
 
     if include_smartertime:
-        events = _union_no_overlap(events, _get_events_smartertime(since))
+        events = _union_no_overlap(events, _get_events_smartertime(since, filepath=include_smartertime))
         events = sorted(events, key=lambda e: e.timestamp)
 
     if include_toggl:
-        events = _union_no_overlap(events, _get_events_toggl(since))
+        events = _union_no_overlap(events, _get_events_toggl(since, filepath=include_toggl))
         events = sorted(events, key=lambda e: e.timestamp)
+
+    # Filter by time
+    events = [e for e in events if since.astimezone(timezone.utc) < e.timestamp and e.timestamp + e.duration < end.astimezone(timezone.utc)]
+    assert all(since.astimezone(timezone.utc) < e.timestamp for e in events)
+    assert all(e.timestamp + e.duration < end.astimezone(timezone.utc) for e in events)
 
     # Filter out events without data (which sometimes happens for whatever reason)
     events = [e for e in events if e.data]
@@ -354,12 +418,24 @@ def _print_category(events, cat="Uncategorized", n=10):
         print(str(duration).split(".")[0], f"{v['title'][:60]} [{v['app']}]")
 
 
+def _datetime_arg(s: str) -> datetime:
+    return datetime.strptime(s, "%Y-%m-%d")
+
+
 def _build_argparse(parser):
+    parser.add_argument('--start', type=_datetime_arg)
+    parser.add_argument('--end', type=_datetime_arg)
+
     subparsers = parser.add_subparsers(dest='cmd2')
     subparsers.add_parser('summary')
-    subparsers.add_parser('summary_plot')
+    subparsers.add_parser('summary_plot').add_argument('--save')
     subparsers.add_parser('apps')
     subparsers.add_parser('cat').add_argument('category')
+
+    cat_plot = subparsers.add_parser('cat_plot')
+    cat_plot.add_argument('--save')
+    cat_plot.add_argument('category', nargs='+')
+
     return parser
 
 
@@ -371,20 +447,46 @@ def pprint_secs_hhmmss(seconds):
             (f"{int(seconds)}s".rjust(3)))
 
 
+def _print_summary(events):
+    start = min(e.timestamp for e in events)
+    end = max(e.timestamp + e.duration for e in events)
+    duration = sum((e.duration for e in events), timedelta(0))
+    coverage = duration / (end - start)
+    print(f"    Start:  {start}")
+    print(f"      End:  {end}")
+    print(f"     Span:  {end - start}")
+    print(f" Duration:  {duration}")
+    print(f" Coverage:  {round(100 * coverage)}%")
+    print()
+
+
+day_offset = timedelta(hours=4)
+
+
+def _plot_category_daily_trend(events, categories):
+    for cat in categories:
+        events_cat = [e for e in events if cat in e.data["$category_hierarchy"]]
+        ts = pd.Series([e.duration.total_seconds() / 3600 for e in events_cat], index=pd.DatetimeIndex([e.timestamp for e in events_cat]).tz_convert("UTC"))
+        ts = ts.resample('1D').apply('sum')
+        ax = ts.plot(label=cat, legend=True)
+        ax = ts.rolling(7, min_periods=2).mean().plot(label=f"{cat} 7d rolling", legend=True)
+        ax = ts.rolling(30, min_periods=2).mean().plot(label=f"{cat} 30d rolling", legend=True)
+    ax.set_ylabel('Hours')
+    plt.xticks(rotation='vertical')
+    plt.ylim(0)
+
+
 def _main(args):
-    if args.cmd2 in ["summary", "summary_plot", "apps", "cat"]:
-        how_far_back = timedelta(hours=1 * 12)
-        events = get_events(datetime.now() - how_far_back)
-        start = min(e.timestamp for e in events)
-        end = max(e.timestamp + e.duration for e in events)
-        duration = sum((e.duration for e in events), timedelta(0))
-        coverage = duration / (end - start)
-        print(f"    Start:  {start}")
-        print(f"      End:  {end}")
-        print(f"     Span:  {end-start}")
-        print(f" Duration:  {duration}")
-        print(f" Coverage:  {round(100 * coverage)}%")
-        print()
+    _init_classes('category_regexes.csv')
+
+    if args.cmd2 in ["summary", "summary_plot", "apps", "cat", "cat_plot"]:
+        if not args.end:
+            args.end = datetime.now()
+        if not args.start:
+            how_far_back = timedelta(hours=1 * 12)
+            args.start = args.end - how_far_back
+        events = get_events(args.start, args.end, include_toggl='./data/private/Toggl_time_entries_2017-12-17_to_2018-11-11.csv')
+        _print_summary(events)
 
         events = classify(events, include_app=False)
         # pprint([e.data["$tags"] for e in classify(events)])
@@ -398,8 +500,18 @@ def _main(args):
                 print(pprint_secs_hhmmss(s) + f"    {c}")
         elif args.cmd2 == "cat":
             _print_category(events, args.category, 30)
+        elif args.cmd2 == "cat_plot":
+            _plot_category_daily_trend(events, args.category)
+            if args.save:
+                plt.savefig(args.save, bbox_inches='tight')
+            else:
+                plt.show()
         elif args.cmd2 == "summary_plot":
-            plot_category_hierarchy_sunburst(events)
+            _plot_category_hierarchy_sunburst(events)
+            if args.save:
+                plt.savefig(args.save, bbox_inches='tight')
+            else:
+                plt.show()
     else:
         print(f'unknown subcommand to classify: {args.cmd2}')
 

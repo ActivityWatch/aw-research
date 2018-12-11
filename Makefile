@@ -1,7 +1,7 @@
 .PHONY: build test run
 
 build:
-	pipenv install
+	pipenv install --skip-lock
 
 test:
 	pipenv run pytest tests/ aw_research/classify.py

@@ -3,3 +3,5 @@ __pycache__
 *.*cache*
 *.egg-info
 private
+categories.csv
+categories.toml

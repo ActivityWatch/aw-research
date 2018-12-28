@@ -1,10 +1,10 @@
 .PHONY: build test run
 
 build:
-	pipenv install
+	pipenv install --dev --skip-lock
 
-test: typecheck
-	pipenv run pytest tests/
+test:
+	pipenv run pytest tests/ aw_research/classify.py
 
 test-integration:
 	pipenv run aw_research redact
@@ -19,7 +19,7 @@ test-integration:
 	#pipenv run python3 aw_research analyse
 
 typecheck:
-	MYPYPATH="./stubs/mypy-data/numpy-mypy/" pipenv run python3 -m mypy --ignore-missing-imports aw_research/ examples/ tests/
+	pipenv run python3 -m mypy --ignore-missing-imports aw_research/ examples/ tests/
 
 .cache-query-result:
 	pipenv run python3 -m aw_client --host localhost:5666 query --json --start 2018-01-01 queries/aw-development.awq > .cache-query-result

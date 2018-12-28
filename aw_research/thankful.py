@@ -9,6 +9,11 @@ import aw_client
 # pip install google-api-python-client
 import apiclient
 
+from joblib import Memory
+
+location = './.cache/thankful'
+memory = Memory(location, verbose=0)
+
 logger = logging.getLogger(__name__)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("googleapiclient").setLevel(logging.WARNING)
@@ -16,6 +21,8 @@ logging.getLogger("googleapiclient").setLevel(logging.WARNING)
 re_video_id = re.compile(r"watch\?v=[a-zA-Z0-9\-_]+")
 re_patreon_id = re.compile(r"patreon.com/[a-zA-Z0-9\-_]+")
 re_bitcoin_addr = re.compile(r"[13][a-km-zA-HJ-NP-Z1-9]{25,34}")
+re_eth_addr = re.compile(r"0x[A-Fa-f0-9]{40}")
+re_email_addr = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
@@ -29,7 +36,7 @@ class PaymentMethod:
         self.url = None
 
 
-def find_patreon_link(text) -> str:
+def find_patreon_link(text: str) -> str:
     # Find Patreon links, they are usually in the Links part of the profile but are sometimes present in user and video descriptions
     # (which is unavailable through the API: https://stackoverflow.com/a/33027866/965332)
     found = re_patreon_id.findall(text)
@@ -38,7 +45,7 @@ def find_patreon_link(text) -> str:
     return found[0] if found else None
 
 
-def find_bitcoin_address(text) -> Optional[str]:
+def find_bitcoin_address(text: str) -> Optional[str]:
     # https://stackoverflow.com/questions/21683680/regex-to-match-bitcoin-addresses
     found = re_bitcoin_addr.findall(text)
     if len(found) > 1:
@@ -46,7 +53,23 @@ def find_bitcoin_address(text) -> Optional[str]:
     return found[0] if found else None
 
 
+def find_eth_address(text: str) -> Optional[str]:
+    found = re_eth_addr.findall(text)
+    if len(found) > 1:
+        logger.warning("Found more than one ethereum address")
+    return found[0] if found else None
+
+
+def find_email_address(text: str) -> Optional[str]:
+    found = re_email_addr.findall(text)
+    if len(found) > 1:
+        logger.warning("Found more than one email address")
+    return found[0] if found else None
+
+
 assert find_patreon_link("patreon.com/3blue1brown")
+assert find_eth_address("0xbD2940e549C38Cc6b201767a0238c2C07820Ef35")
+assert find_email_address("erik@bjareho.lt")
 
 
 class Creator:
@@ -67,7 +90,7 @@ class Creator:
         return "<Creator('{}', title='{}', payment_methods='{}')>".format(
             self.id,
             self.title,
-            "".join(self.payment_methods.keys())
+            str(list(self.payment_methods.keys()))
         )
 
     def add_youtube_data(self):
@@ -80,27 +103,46 @@ class Creator:
             self.description = creator_data["snippet"]["description"]
 
     def find_payment_methods(self):
-        self._find_patreon(self.description)
-        self._find_bitcoin(self.description)
+        if self.description:
+            self._find_patreon(self.description)
+            self._find_bitcoin(self.description)
+            self._find_eth(self.description)
+            self._find_email(self.description)
+        else:
+            print('No channel description')
 
         for c in self.creations:
             if "patreon" not in self.payment_methods:
                 self._find_patreon(c.description)
             if "bitcoin" not in self.payment_methods:
                 self._find_bitcoin(c.description)
+            if "eth" not in self.payment_methods:
+                self._find_eth(c.description)
+            if "email" not in self.payment_methods:
+                self._find_email(c.description)
 
     def register_creation(self, creation: "Content"):
         self.creations.append(creation)
 
-    def _find_patreon(self, text):
+    def _find_patreon(self, text: str):
         patreon_link = find_patreon_link(text)
         if patreon_link:
             self.payment_methods["patreon"] = patreon_link
 
-    def _find_bitcoin(self, text):
+    def _find_bitcoin(self, text: str):
         bitcoin_addr = find_bitcoin_address(text)
         if bitcoin_addr:
             self.payment_methods["bitcoin"] = bitcoin_addr
+
+    def _find_eth(self, text: str):
+        eth_addr = find_eth_address(text)
+        if eth_addr:
+            self.payment_methods["eth"] = eth_addr
+
+    def _find_email(self, text: str):
+        addr = find_email_address(text)
+        if addr:
+            self.payment_methods["email"] = addr
 
 
 class Content:
@@ -151,7 +193,7 @@ class Content:
 
 def find_youtube_content(events) -> List[Content]:
     """Finds YouTube content in events"""
-    videos = defaultdict(lambda: Content())  # type: Dict[str, Content]
+    videos = defaultdict(Content)  # type: Dict[str, Content]
 
     for event in events:
         if "youtube.com/watch?v=" in event.data["url"]:
@@ -160,8 +202,8 @@ def find_youtube_content(events) -> List[Content]:
                 video_id = found[0][8:]
                 videos[video_id].duration += event.duration.total_seconds()
 
-    for id, video in videos.items():
-        video.id = id
+    for id_, video in videos.items():
+        video.id = id_
 
     return list(videos.values())
 
@@ -188,27 +230,46 @@ def assign_videos_to_channels(videos, channels):
             channel.register_creation(video)
 
 
-def _main():
-    logging.basicConfig(level=logging.DEBUG)
-
+@memory.cache()
+def get_yt_videos():
     awapi = aw_client.ActivityWatchClient("thankful-test", testing=True)
     web_events = awapi.get_events(bucket_id="aw-watcher-web-chrome", limit=-1)
 
     yt_videos = find_youtube_content(web_events)
     for video in yt_videos:
         video.add_youtube_data()
-    # pprint(yt_videos)
+    return yt_videos
 
+
+@memory.cache()
+def get_channels(yt_videos):
     channels = get_channels_from_videos(yt_videos)
     assign_videos_to_channels(yt_videos, channels)
     for channel in channels:
         channel.find_payment_methods()
+    return channels
+
+
+def _main():
+    logging.basicConfig(level=logging.DEBUG)
+
+    channels = get_channels(get_yt_videos())
+
+    # for channel in channels:
+    #     if channel.payment_methods:
+    #         print(channel)
+
+    for c in channels:
+        if c.payment_methods or c.description and re.findall('(BTC|[Bb]itcoin)|(ETH|[Ee]ther(eum)?)', c.description):
+            print("-" * 80)
+            print(c)
+            print(c.description)
 
     n_with_payment_methods = len(list(filter(lambda c: c.payment_methods, channels)))
     print("Number of found channels with payment methods: {} out of {}".format(n_with_payment_methods, len(channels)))
 
-    for method in ["bitcoin", "patreon"]:
-        n_with_method = len(list(filter(lambda c: method in c.payment_methods, channels)))
+    for method in ["eth", "bitcoin", "patreon", "email"]:
+        n_with_method = len([c for c in channels if method in c.payment_methods])
         print(" - {}: {} out of {}".format(method, n_with_method, len(channels)))
 
     # pprint(channels)

@@ -17,6 +17,7 @@ pandas = "*"
 pytz = "*"
 joblib = "*"
 toml = "*"
+aw-research = {path = "."}
 
 [dev-packages]
 pydash = "*"

@@ -4,6 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+aw-core = {editable = true,git = "https://github.com/ActivityWatch/aw-core.git"}
 aw-client = {editable = true,git = "https://github.com/ActivityWatch/aw-client.git"}
 numpy = "*"
 matplotlib = "*"

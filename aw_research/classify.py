@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from copy import deepcopy
 from functools import wraps
 
+import toml
 import pytz
 import pydash
 import matplotlib.pyplot as plt
@@ -27,24 +28,63 @@ from .plot_sunburst import sunburst
 memory = joblib.Memory('./.cache/joblib')
 
 
-def read_class_csv(filename) -> List[Tuple[str, ...]]:
+def _read_class_csv(filename) -> List[Tuple[str, str, Optional[str]]]:
     with open(filename) as f:
-        return [(*line.strip().split(";"), '')[:3] for line in f.readlines() if line.strip() and not line.startswith("#")]
+        classes = []
+        for line in f.readlines():
+            if line.strip() and not line.startswith("#"):
+                re, cat, parent = (line.strip().split(";") + [''])[:3]
+                classes.append((re, cat, parent or None))
+        return classes
 
 
-classes: Optional[List] = None
+def test_read_class_csv():
+    assert _read_class_csv('categories.example.csv')
+
+
+def _read_class_toml(filename) -> List[Tuple[str, str, Optional[str]]]:
+    classes = []
+    with open(filename) as f:
+        data = toml.load(f)
+
+    def _register_category_object(d, cat_name=None, parent=None):
+        """Recursively registers categories"""
+        if isinstance(d, str):
+            assert cat_name
+            classes.append((d, cat_name, parent))
+        elif isinstance(d, dict):
+            if "$re" in d:
+                _register_category_object(d["$re"], cat_name=cat_name, parent=parent)
+                d.pop("$re")
+            for k in d:
+                _register_category_object(d[k], cat_name=k, parent=cat_name)
+
+    _register_category_object(data['categories'])
+    return classes
+
+
+def test_read_class_toml():
+    assert _read_class_toml('categories.example.toml')
+
+
+classes: Optional[List[Tuple[str, str, Optional[str]]]] = None
 parent_categories: Optional[Dict[str, str]] = None
 
 
-def _init_classes(class_csv_filename=None, new_classes=None):
+def _init_classes(filename: str=None, new_classes: List[Tuple[str, str, Optional[str]]]=None):
     global classes, parent_categories
-    if class_csv_filename:
-        classes = read_class_csv(class_csv_filename)
+
+    if filename and filename.endswith('csv'):
+        classes = _read_class_csv(filename)
+    elif filename and filename.endswith('toml'):
+        classes = _read_class_toml(filename)
     elif new_classes:
         classes = new_classes
     else:
         raise Exception
-    parent_categories = {tag: parent for _, tag, parent in classes}
+
+    assert classes
+    parent_categories = {tag: parent for _, tag, parent in classes if parent}
 
 
 def requires_init_classes(f):
@@ -182,8 +222,8 @@ def time_per_app(events):
     return c
 
 
-def query_func(f):
-    """Decorator for transforming Python functions into query2 strings"""
+def query2ify(f):
+    """Decorator that transforms a Python function into query2 strings using inspection"""
     import inspect
     srclines = inspect.getsource(f).split("\n")
     srclines = srclines[2:]  # remove decoration and function definition
@@ -197,19 +237,26 @@ def query_func(f):
 
 # The following function is later turned into a query string through introspection.
 # Fancy logic will obviously not work either.
-@query_func
+@query2ify
 def query_complete():  # noqa
     from aw_transform import query_bucket, find_bucket, filter_keyvals, exclude_keyvals, period_union, concat
-    browsernames = ["Chromium"]  # TODO: Include more browsers
+    browsernames_chrome = ["Chromium"]  # TODO: Include more browsers
+    browsernames_ff = ["Firefox"]  # TODO: Include more browsers
+
     events = flood(query_bucket(find_bucket("aw-watcher-window")))
-    events_web = flood(query_bucket(find_bucket("aw-watcher-web")))
+    events_web_chrome = flood(query_bucket(find_bucket("aw-watcher-web-chrome")))
+    events_web_ff = flood(query_bucket(find_bucket("aw-watcher-web-firefox")))
     events_afk = flood(query_bucket(find_bucket("aw-watcher-afk")))
 
     # Combine window events with web events
-    events_browser = filter_keyvals(events, "app", browsernames)
-    events_web = filter_period_intersect(events_web, events_browser)
-    events = exclude_keyvals(events, "app", browsernames)
-    events = concat(events, events_web)
+    events_browser_chrome = filter_keyvals(events, "app", browsernames_chrome)
+    events_web_chrome = filter_period_intersect(events_web_chrome, events_browser_chrome)
+
+    events_browser_ff = filter_keyvals(events, "app", browsernames_ff)
+    events_web = concat(events_web_ff, filter_period_intersect(events_web_ff, events_browser_ff))
+    events = exclude_keyvals(events, "app", browsernames_chrome)
+    events = exclude_keyvals(events, "app", browsernames_ff)
+    events = concat(events, events_web_ff)
 
     # Filter away non-afk and non-audible time
     events_notafk = filter_keyvals(events_afk, "status", ["not-afk"])
@@ -355,11 +402,13 @@ def test_union_no_overlap():
     # pprint(events_union)
     dur = sum((e.duration for e in events_union), timedelta(0))
     assert dur == timedelta(hours=4, minutes=30)
+    assert sorted(events_union, key=lambda e: e.timestamp)
 
     events_union = _union_no_overlap(events2, events1)
     # pprint(events_union)
     dur = sum((e.duration for e in events_union), timedelta(0))
     assert dur == timedelta(hours=4, minutes=30)
+    assert sorted(events_union, key=lambda e: e.timestamp)
 
     events1 = [Event(timestamp=now + (2 * i) * td1h, duration=td1h, data={'test': 1}) for i in range(3)]
     events2 = [Event(timestamp=now, duration=5 * td1h, data={'test': 2})]
@@ -367,11 +416,12 @@ def test_union_no_overlap():
     pprint(events_union)
     dur = sum((e.duration for e in events_union), timedelta(0))
     assert dur == timedelta(hours=5, minutes=0)
+    assert sorted(events_union, key=lambda e: e.timestamp)
 
 
 @memory.cache
 def get_events(since: datetime, end: datetime, include_smartertime='auto', include_toggl=None) -> List[Event]:
-    awc = ActivityWatchClient("test", testing=True)
+    awc = ActivityWatchClient("test", testing=False)
 
     # print(query_complete)
     result = awc.query(query_complete, start=since, end=end)

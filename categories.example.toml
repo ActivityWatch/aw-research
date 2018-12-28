@@ -1,0 +1,11 @@
+[categories]
+Communication = 'Messenger|(messaged you)|Gmail|Calendar'
+
+    [categories.Media]
+    Music = "[Ss]potify|[Ss]oundcloud"
+    Video = "[Yy]ouTube|[Vv]imeo|[Pp]lex|TED Talk"
+    "Social Media" = "[Ff]acebook|[Rr]eddit|[Tt]witter"
+
+    [categories.Work]
+    $re = "Google (Sheets|Slides|Forms)|Analytics"
+    Programming = "[Pp]rogramming|[Gg]it[Hh]ub|[Pp]ython|localhost|Pull Request|doc(s|umentation)|Stack Overflow"

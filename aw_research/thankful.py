@@ -9,6 +9,11 @@ import aw_client
 # pip install google-api-python-client
 import apiclient
 
+from joblib import Memory
+
+location = './.cache/thankful'
+memory = Memory(location, verbose=0)
+
 logger = logging.getLogger(__name__)
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 logging.getLogger("googleapiclient").setLevel(logging.WARNING)
@@ -223,11 +228,6 @@ def assign_videos_to_channels(videos, channels):
         if "channelId" in video.data:
             channel = channels[video.data["channelId"]]
             channel.register_creation(video)
-
-
-from joblib import Memory
-location = './.cache/thankful'
-memory = Memory(location, verbose=0)
 
 
 @memory.cache()

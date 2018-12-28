@@ -15,6 +15,7 @@ calmap = "*"
 pandas = "*"
 pytz = "*"
 joblib = "*"
+toml = "*"
 
 [dev-packages]
 pydash = "*"

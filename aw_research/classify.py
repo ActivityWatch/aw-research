@@ -253,10 +253,12 @@ def query_complete():  # noqa
     events_web_chrome = filter_period_intersect(events_web_chrome, events_browser_chrome)
 
     events_browser_ff = filter_keyvals(events, "app", browsernames_ff)
-    events_web = concat(events_web_ff, filter_period_intersect(events_web_ff, events_browser_ff))
+    events_web_ff = filter_period_intersect(events_web_ff, events_browser_ff)
+
+    events_web = concat(events_web_ff, events_web_chrome)
     events = exclude_keyvals(events, "app", browsernames_chrome)
     events = exclude_keyvals(events, "app", browsernames_ff)
-    events = concat(events, events_web_ff)
+    events = concat(events, events_web)
 
     # Filter away non-afk and non-audible time
     events_notafk = filter_keyvals(events_afk, "status", ["not-afk"])
@@ -423,7 +425,7 @@ def test_union_no_overlap():
 def get_events(since: datetime, end: datetime, include_smartertime='auto', include_toggl=None) -> List[Event]:
     awc = ActivityWatchClient("test", testing=False)
 
-    # print(query_complete)
+    #print(query_complete)
     result = awc.query(query_complete, start=since, end=end)
     events = [Event(**e) for e in result[0]]
 
@@ -529,13 +531,15 @@ def _plot_category_daily_trend(events, categories):
 def _main(args):
     _init_classes('category_regexes.csv')
 
+    print(args)
+
     if args.cmd2 in ["summary", "summary_plot", "apps", "cat", "cat_plot"]:
         if not args.end:
             args.end = datetime.now()
         if not args.start:
-            how_far_back = timedelta(hours=1 * 12)
+            how_far_back = timedelta(hours=1 * 24)
             args.start = args.end - how_far_back
-        events = get_events(args.start, args.end, include_toggl='./data/private/Toggl_time_entries_2017-12-17_to_2018-11-11.csv')
+        events = get_events(args.start, args.end, False)
         _print_summary(events)
 
         events = classify(events, include_app=False)

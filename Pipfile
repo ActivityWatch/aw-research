@@ -23,6 +23,7 @@ toml = "*"
 pydash = "*"
 mypy = "*"
 pytest = "*"
+pytest-cov = "*"
 
 [scripts]
 aw_research = "python3 -m aw_research"

@@ -53,11 +53,14 @@ def _read_class_toml(filename) -> List[Tuple[str, str, Optional[str]]]:
             assert cat_name
             classes.append((d, cat_name, parent))
         elif isinstance(d, dict):
+            for k in d:
+                if k == "$re":
+                    # Handle this case last
+                    continue
+                _register_category_object(d[k], cat_name=k, parent=cat_name)
             if "$re" in d:
                 _register_category_object(d["$re"], cat_name=cat_name, parent=parent)
                 d.pop("$re")
-            for k in d:
-                _register_category_object(d[k], cat_name=k, parent=cat_name)
 
     _register_category_object(data['categories'])
     return classes
@@ -109,6 +112,9 @@ def get_parent_categories(cat: str) -> Set[str]:
     return set()
 
 
+hier_sep = "->"
+
+
 @requires_init_classes
 def build_category_hierarchy(cat: str, app: str = None) -> str:
     assert parent_categories  # just to quiet typechecker, checked by decorator
@@ -119,11 +125,11 @@ def build_category_hierarchy(cat: str, app: str = None) -> str:
         parent = parent_categories[cat]
         parents_of_parent = build_category_hierarchy(parent)
         if parents_of_parent:
-            s = parents_of_parent + " -> " + s
+            s = f"{parents_of_parent} {hier_sep} {s}"
     if app:
         app = app.lstrip("www.").rstrip(".com")
         if app.lower() not in s.lower():
-            s = s + " -> " + app
+            s = f"{s} {hier_sep} {app}"
     return s
 
 
@@ -131,33 +137,38 @@ def build_category_hierarchy(cat: str, app: str = None) -> str:
 def classify(events: List[Event], include_app=False, max_category_depth=3) -> List[Event]:
     assert classes  # just to quiet typechecker, checked by decorator
 
-    if classes is None:
-        raise Exception('Classes not initialized, run _init_classes first.')
-
-    for event in events:
-        event.data["$tags"] = set()
-        event.data["$category_hierarchy"] = "Uncategorized"
+    for e in events:
+        e.data["$tags"] = set()
+        e.data["$category_hierarchy"] = "Uncategorized"
 
     for re_pattern, cat, _ in classes:
         r = re.compile(re_pattern)
-        for event in events:
+        for e in events:
             for attr in ["title", "app", "url"]:
-                if attr not in event.data:
+                if attr not in e.data:
                     continue
-                if cat not in event.data["$tags"] and \
-                   r.findall(event.data[attr]):
-                    app = event.data['app'] if include_app and 'app' in event.data else None
-                    event.data["$category_hierarchy"] = build_category_hierarchy(cat, app=app)
-                    event.data["$tags"].add(cat)
-                    event.data["$tags"] |= get_parent_categories(cat)
+                if cat not in e.data["$tags"] and \
+                   r.findall(e.data[attr]):
+                    e.data["$tags"].add(cat)
+                    e.data["$tags"] |= get_parent_categories(cat)
+
+    for e in events:
+        app = e.data.get('app', None) if include_app else None
+        for cat in e.data["$tags"]:
+            # Always assign the deepest category
+            new_cat_hier = build_category_hierarchy(cat, app=app)
+            if "$category_hierarchy" in e.data:
+                old_cat_hier = e.data["$category_hierarchy"]
+                if old_cat_hier.count(hier_sep) >= new_cat_hier.count(hier_sep):
+                    continue
+            e.data["$category_hierarchy"] = new_cat_hier
+
+        # Restrict maximum category depth
+        e.data['$category_hierarchy'] = _restrict_category_depth(e.data["$category_hierarchy"], max_category_depth)
 
     for e in events:
         if not e.data["$tags"]:
             e.data["$tags"].add("Uncategorized")
-
-    # Restrict maximum category depth
-    for e in events:
-        e.data['$category_hierarchy'] = _restrict_category_depth(e.data["$category_hierarchy"], max_category_depth)
 
     return events
 
@@ -244,19 +255,23 @@ def query_complete():  # noqa
     browsernames_ff = ["Firefox"]  # TODO: Include more browsers
 
     events = flood(query_bucket(find_bucket("aw-watcher-window")))
+    events_afk = query_bucket(find_bucket("aw-watcher-afk"))  # TODO: Readd flooding for afk-events once a release has been made that includes the flooding-fix
     events_web_chrome = flood(query_bucket(find_bucket("aw-watcher-web-chrome")))
     events_web_ff = flood(query_bucket(find_bucket("aw-watcher-web-firefox")))
-    events_afk = flood(query_bucket(find_bucket("aw-watcher-afk")))
 
     # Combine window events with web events
     events_browser_chrome = filter_keyvals(events, "app", browsernames_chrome)
     events_web_chrome = filter_period_intersect(events_web_chrome, events_browser_chrome)
 
     events_browser_ff = filter_keyvals(events, "app", browsernames_ff)
-    events_web = concat(events_web_ff, filter_period_intersect(events_web_ff, events_browser_ff))
+    events_web_ff = filter_period_intersect(events_web_ff, events_browser_ff)
+
+    events_web = concat(events_web_chrome, events_web_ff)
+
+    # TODO: Brower events should only be excluded when there's a web-event replacing it
     events = exclude_keyvals(events, "app", browsernames_chrome)
     events = exclude_keyvals(events, "app", browsernames_ff)
-    events = concat(events, events_web_ff)
+    events = concat(events, events_web)
 
     # Filter away non-afk and non-audible time
     events_notafk = filter_keyvals(events_afk, "status", ["not-afk"])
@@ -294,6 +309,7 @@ def _get_events_toggl(since: datetime, filepath: str) -> List[Event]:
 
 
 def _get_events_smartertime(since: datetime, filepath: str='auto') -> List[Event]:
+    # TODO: Use aw_research.importers.smartertime to generate json file if filepath is smartertime export (.csv)
     if filepath == 'auto':
         from glob import glob
         filepath = sorted(glob("data/private/smartertime_export_*.awbucket.json"))[-1]
@@ -349,7 +365,6 @@ def _union_no_overlap(events1, events2):
       result   | xxx--  xx ----xxx  -- |
     """
     # TODO: Move to aw-transform
-
     events1 = deepcopy(events1)
     events2 = deepcopy(events2)
 
@@ -366,12 +381,14 @@ def _union_no_overlap(events1, events2):
         if e1_p.intersects(e2_p):
             if e1.timestamp <= e2.timestamp:
                 events_union.append(e1)
+                e1_i += 1
+
+                # If e2 continues after e1, we need to split up the event so we only get the part that comes after
                 _, e2_next = _split_event(e2, e1.timestamp + e1.duration)
                 if e2_next:
                     events2[e2_i] = e2_next
                 else:
                     e2_i += 1
-                e1_i += 1
             else:
                 e2_next, e2_next2 = _split_event(e2, e1.timestamp)
                 events_union.append(e2_next)
@@ -379,7 +396,7 @@ def _union_no_overlap(events1, events2):
                 if e2_next2:
                     events2.insert(e2_i, e2_next2)
         else:
-            if e1.timestamp < e2.timestamp:
+            if e1.timestamp <= e2.timestamp:
                 events_union.append(e1)
                 e1_i += 1
             else:

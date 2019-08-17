@@ -18,6 +18,8 @@ pandas = "*"
 pytz = "*"
 joblib = "*"
 toml = "*"
+tabulate = "*"
+togglcli = "*"
 
 [dev-packages]
 pydash = "*"

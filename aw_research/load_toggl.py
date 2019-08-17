@@ -2,7 +2,7 @@ import logging
 from typing import List
 from datetime import datetime, timezone
 
-from toggl import api
+#from toggl import api
 
 from aw_core import Event
 

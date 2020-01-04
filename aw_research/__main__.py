@@ -49,11 +49,6 @@ def _get_window_events(n=1000):
         return []
 
 
-def _load_sensitive_words():
-    with open("sensitive_words.txt") as f:
-        return (word.lower() for word in f.read().split("\n") if word)
-
-
 def _main_redact(pattern: str, ignore_case: bool):
     logger.info("Retrieving events...")
     events = _get_window_events()

@@ -5,3 +5,5 @@ __pycache__
 private
 categories.csv
 categories.toml
+.coverage*
+htmlcov

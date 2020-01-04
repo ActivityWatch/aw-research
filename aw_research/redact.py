@@ -5,7 +5,7 @@
 
 import re
 import logging
-from typing import List, Callable, Tuple
+from typing import List, Callable, Tuple, Pattern, Any
 from pprint import pprint
 
 from aw_core.models import Event
@@ -31,10 +31,9 @@ def _redact(events: List[Event], f: Callable[[str], bool]) -> Tuple[List[Event],
     return events, n
 
 
-def redact_words(events, words):
-    words_pattern = r"\b({})\b".format(("|".join(re.escape(bw.lower()) for bw in words)))
-    r = re.compile(words_pattern)
-    events, n_redacted = _redact(events, lambda s: r.search(s.lower()))
+def redact_words(events: List[Event], pattern: str, ignore_case=False):
+    r = re.compile(pattern.lower() if ignore_case else pattern)
+    events, n_redacted = _redact(events, lambda s: bool(r.search(s.lower() if ignore_case else s)))
 
     percent = round(100 * n_redacted / len(events), 2)
     logger.info("# Redacted\n\tTotal: {}\n\tRedacted: {}\n\tPercent: {}%".format(len(events), n_redacted, percent))

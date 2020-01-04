@@ -1,5 +1,6 @@
 import logging
 import argparse
+from typing import List, Pattern
 from pprint import pprint
 from collections import defaultdict
 from datetime import timedelta
@@ -53,14 +54,14 @@ def _load_sensitive_words():
         return (word.lower() for word in f.read().split("\n") if word)
 
 
-def _main_redact():
+def _main_redact(pattern: str, ignore_case: bool):
     logger.info("Retrieving events...")
     events = _get_window_events()
 
-    logger.info("Redacting...")
-    sensitive_words = list(_load_sensitive_words())
-    logger.info("Sensitive words: " + str(sensitive_words))
-    events = redact_words(events, sensitive_words)
+    logger.info("Redacting using regular expression: " + pattern)
+    events = redact_words(events, pattern, ignore_case=ignore_case)
+
+    print("NOTE: Redactions are not persisted to server")
 
 
 def _main_analyse():
@@ -145,7 +146,9 @@ def print_most_common_titles(events):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="cmd")
-    subparsers.add_parser('redact')
+    redact = subparsers.add_parser('redact')
+    redact.add_argument('pattern', help="Regular expression to match events with, a good example that matches on 3 words: \b(sensitive|secret|)\b")
+    redact.add_argument('--ignore-case', action='store_true', help="Ignore case sensitivity (the pattern and all strings are lowercased before matching)")
     subparsers.add_parser('analyse')
     subparsers.add_parser('merge')
     subparsers.add_parser('flood')
@@ -156,7 +159,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.cmd == "redact":
-        _main_redact()
+        _main_redact(args.pattern, args.ignore_case)
     elif args.cmd == "analyse":
         _main_analyse()
     elif args.cmd == "merge":

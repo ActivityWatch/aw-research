@@ -2,7 +2,10 @@ import os
 import logging
 from typing import List
 
-import Algorithmia
+try:
+    import Algorithmia
+except ImportError:
+    pass
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ matrix:
    - python: "nightly"
 
 install:
- - "pip install pipenv"
+ - "pip install poetry"
  - "make build"
 
 script:

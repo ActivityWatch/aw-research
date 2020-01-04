@@ -4,6 +4,9 @@ version = "0.1.0"
 description = ""
 authors = ["Erik Bjäreholt <erik@bjareho.lt>"]
 
+[tool.poetry.scripts]
+aw-research = "aw_research.main:main"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 numpy = "^1.18.0"

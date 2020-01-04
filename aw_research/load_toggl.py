@@ -2,7 +2,10 @@ import logging
 from typing import List
 from datetime import datetime, timezone
 
-from toggl import api
+try:
+    from toggl import api
+except ModuleNotFoundError:
+    pass
 
 from aw_core import Event
 

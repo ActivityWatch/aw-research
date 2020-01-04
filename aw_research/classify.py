@@ -254,8 +254,8 @@ def query_complete():  # noqa
     browsernames_chrome = ["Chromium"]  # TODO: Include more browsers
     browsernames_ff = ["Firefox"]  # TODO: Include more browsers
 
-    events = flood(query_bucket(find_bucket("aw-watcher-window")))
-    events_afk = query_bucket(find_bucket("aw-watcher-afk"))  # TODO: Readd flooding for afk-events once a release has been made that includes the flooding-fix
+    events = flood(query_bucket(find_bucket("aw-watcher-window_erb-main2")))
+    events_afk = query_bucket(find_bucket("aw-watcher-afk_erb-main2"))  # TODO: Readd flooding for afk-events once a release has been made that includes the flooding-fix
     events_web_chrome = flood(query_bucket(find_bucket("aw-watcher-web-chrome")))
     events_web_ff = flood(query_bucket(find_bucket("aw-watcher-web-firefox")))
 
@@ -268,12 +268,12 @@ def query_complete():  # noqa
 
     events_web = concat(events_web_chrome, events_web_ff)
 
-    # TODO: Brower events should only be excluded when there's a web-event replacing it
+    # TODO: Browser events should only be excluded when there's a web-event replacing it
     events = exclude_keyvals(events, "app", browsernames_chrome)
     events = exclude_keyvals(events, "app", browsernames_ff)
     events = concat(events, events_web)
 
-    # Filter away non-afk and non-audible time
+    # Filter away all inactive (afk and non-audible) time
     events_notafk = filter_keyvals(events_afk, "status", ["not-afk"])
     events_audible = filter_keyvals(events_web, "audible", [True])
     events_active = period_union(events_notafk, events_audible)

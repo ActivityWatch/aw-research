@@ -233,7 +233,7 @@ def time_per_app(events):
     return c
 
 
-def query2ify(f):
+def query2ify(f) -> str:
     """Decorator that transforms a Python function into query2 strings using inspection"""
     import inspect
     srclines = inspect.getsource(f).split("\n")
@@ -246,16 +246,25 @@ def query2ify(f):
     return ";\n".join(srclines)
 
 
+def build_query(hostname: str):
+    query = _query_complete
+    query = query.replace('hostname = ""', f'hostname = "{hostname}"')
+    return query
+
 # The following function is later turned into a query string through introspection.
 # Fancy logic will obviously not work either.
+# TODO: This doesn't correctly handle web buckets since they don't have a hostname set
 @query2ify
-def query_complete():  # noqa
+def _query_complete():  # noqa
     from aw_transform import query_bucket, find_bucket, filter_keyvals, exclude_keyvals, period_union, concat
+
+    hostname = ""  # set in preprocessing
+
     browsernames_chrome = ["Chromium"]  # TODO: Include more browsers
     browsernames_ff = ["Firefox"]  # TODO: Include more browsers
 
-    events = flood(query_bucket(find_bucket("aw-watcher-window_erb-main2")))
-    events_afk = query_bucket(find_bucket("aw-watcher-afk_erb-main2"))  # TODO: Readd flooding for afk-events once a release has been made that includes the flooding-fix
+    events = flood(query_bucket(find_bucket("aw-watcher-window", hostname)))
+    events_afk = query_bucket(find_bucket("aw-watcher-afk", hostname))  # TODO: Readd flooding for afk-events once a release has been made that includes the flooding-fix
     events_web_chrome = flood(query_bucket(find_bucket("aw-watcher-web-chrome")))
     events_web_ff = flood(query_bucket(find_bucket("aw-watcher-web-firefox")))
 
@@ -308,7 +317,7 @@ def _get_events_toggl(since: datetime, filepath: str) -> List[Event]:
     return events
 
 
-def _get_events_smartertime(since: datetime, filepath: str='auto') -> List[Event]:
+def _get_events_smartertime(since: datetime, filepath: str = 'auto') -> List[Event]:
     # TODO: Use aw_research.importers.smartertime to generate json file if filepath is smartertime export (.csv)
     if filepath == 'auto':
         from glob import glob
@@ -356,6 +365,7 @@ def test_split_event():
     assert e2.duration == td1h
 
 
+# TODO: Move to aw-transform
 def _union_no_overlap(events1, events2):
     """Merges two eventlists and removes overlap, the first eventlist will have precedence
 
@@ -364,7 +374,6 @@ def _union_no_overlap(events1, events2):
       events1  |  ----     ------   -- |
       result   | xxx--  xx ----xxx  -- |
     """
-    # TODO: Move to aw-transform
     events1 = deepcopy(events1)
     events2 = deepcopy(events2)
 
@@ -437,11 +446,12 @@ def test_union_no_overlap():
 
 
 @memory.cache
-def get_events(since: datetime, end: datetime, include_smartertime='auto', include_toggl=None) -> List[Event]:
+def get_events(hostname: str, since: datetime, end: datetime, include_smartertime='auto', include_toggl=None) -> List[Event]:
     awc = ActivityWatchClient("test", testing=False)
 
     # print(query_complete)
-    result = awc.query(query_complete, start=since, end=end)
+    query = build_query(hostname)
+    result = awc.query(query, start=since, end=end)
     events = [Event(**e) for e in result[0]]
 
     if include_smartertime:
@@ -544,7 +554,7 @@ def _plot_category_daily_trend(events, categories):
 
 
 def _main(args):
-    _init_classes('category_regexes.csv')
+    _init_classes('categories.toml')
 
     if args.cmd2 in ["summary", "summary_plot", "apps", "cat", "cat_plot"]:
         if not args.end:

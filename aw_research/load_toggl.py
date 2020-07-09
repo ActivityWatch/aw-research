@@ -9,7 +9,7 @@ except ModuleNotFoundError:
 
 from aw_core import Event
 
-logging.getLogger('toggl.utils').setLevel(logging.WARNING)
+logging.getLogger("toggl.utils").setLevel(logging.WARNING)
 
 
 def load_toggl(start: datetime, stop: datetime) -> List[Event]:
@@ -19,10 +19,20 @@ def load_toggl(start: datetime, stop: datetime) -> List[Event]:
     def entries_from_all_workspaces():
         # [ ] TODO: Several issues, such as not setting the user of each TimeEntry and setting the same workspace on every TimeEntry
         workspaces = list(api.Workspace.objects.all())
-        print(f'Found {len(workspaces)} workspaces: {list(w.name for w in workspaces)}')
-        entries = __builtins__.sum([list(api.TimeEntry.objects.all_from_reports(start=start, stop=stop, workspace=workspace)) for workspace in workspaces], [])
+        print(f"Found {len(workspaces)} workspaces: {list(w.name for w in workspaces)}")
+        entries = __builtins__.sum(
+            [
+                list(
+                    api.TimeEntry.objects.all_from_reports(
+                        start=start, stop=stop, workspace=workspace
+                    )
+                )
+                for workspace in workspaces
+            ],
+            [],
+        )
         for e in entries[-10:]:
-            print(e['workspace'], e['project'])
+            print(e["workspace"], e["project"])
         return [e.to_dict() for e in entries]
 
     def entries_from_main_workspace():
@@ -33,18 +43,24 @@ def load_toggl(start: datetime, stop: datetime) -> List[Event]:
     print(f"Found {len(entries)} time entries in Toggl")
     events_toggl = []
     for e in entries:
-        if e['start'] < start.astimezone(timezone.utc):
+        if e["start"] < start.astimezone(timezone.utc):
             continue
-        project = e['project'].name if e['project'] else 'no project'
+        project = e["project"].name if e["project"] else "no project"
         try:
-            client = e['project'].client.name
+            client = e["project"].client.name
         except AttributeError:
-            client = 'no client'
-        description = e['description']
-        events_toggl.append(Event(timestamp=e['start'].isoformat(),
-                                  duration=e['duration'],
-                                  data={'app': project,
-                                        'title': f"{client or 'no client'} -> {project or 'no project'} -> {description or 'no description'}",
-                                        '$source': 'toggl'}))
+            client = "no client"
+        description = e["description"]
+        events_toggl.append(
+            Event(
+                timestamp=e["start"].isoformat(),
+                duration=e["duration"],
+                data={
+                    "app": project,
+                    "title": f"{client or 'no client'} -> {project or 'no project'} -> {description or 'no description'}",
+                    "$source": "toggl",
+                },
+            )
+        )
 
     return sorted(events_toggl, key=lambda e: e.timestamp)

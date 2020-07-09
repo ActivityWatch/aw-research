@@ -38,7 +38,15 @@ def barchart(x: List[datetime], bar_sets: List[List[float]]):
     colors = color_gen()
     for bars in bar_sets:
         color = next(colors)
-        ax.bar(x, bars, width=1 / 24 / 1.5, align="center", color=color, bottom=bottom, label="a")
+        ax.bar(
+            x,
+            bars,
+            width=1 / 24 / 1.5,
+            align="center",
+            color=color,
+            bottom=bottom,
+            label="a",
+        )
         bottom = [bottom[i] + bars[i] for i in range(n)]
 
     ax.legend()
@@ -46,7 +54,7 @@ def barchart(x: List[datetime], bar_sets: List[List[float]]):
 
 
 if __name__ == "__main__":
-    plt.style.use('ggplot')
+    plt.style.use("ggplot")
 
     n = 50
     x = [now + timedelta(hours=i) for i in range(n)]

@@ -21,6 +21,9 @@ test-integration:
 typecheck:
 	mypy --ignore-missing-imports --check-untyped-defs aw_research/ examples/ tests/
 
+style-fix:
+	black aw_research/ tests/
+
 .cache-query-result:
 	python3 -m aw_client --host localhost:5666 query --json --start 2018-01-01 queries/aw-development.awq > .cache-query-result
 

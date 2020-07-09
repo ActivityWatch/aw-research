@@ -81,7 +81,11 @@ def _main_merge():
     events = simplify_string(events)
 
     merged_events = merge_close_and_similar(events)
-    print("{} events became {} after merging of similar ones".format(len(events), len(merged_events)))
+    print(
+        "{} events became {} after merging of similar ones".format(
+            len(events), len(merged_events)
+        )
+    )
 
     # Debugging
     assert_no_overlap(events)
@@ -129,6 +133,7 @@ def print_most_common_titles(events):
 
     def total_duration(events):
         return sum((e.duration for e in events), timedelta(0))
+
     print("Total duration: {}".format(total_duration(events)))
 
     pairs = sorted(zip(counter.values(), counter.keys()), reverse=True)
@@ -141,14 +146,21 @@ def print_most_common_titles(events):
 def main():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="cmd")
-    redact = subparsers.add_parser('redact')
-    redact.add_argument('pattern', help="Regular expression to match events with, a good example that matches on 3 words: \b(sensitive|secret|)\b")
-    redact.add_argument('--ignore-case', action='store_true', help="Ignore case sensitivity (the pattern and all strings are lowercased before matching)")
-    subparsers.add_parser('analyse')
-    subparsers.add_parser('merge')
-    subparsers.add_parser('flood')
-    subparsers.add_parser('heartbeat')
-    classify = subparsers.add_parser('classify')
+    redact = subparsers.add_parser("redact")
+    redact.add_argument(
+        "pattern",
+        help="Regular expression to match events with, a good example that matches on 3 words: \b(sensitive|secret|)\b",
+    )
+    redact.add_argument(
+        "--ignore-case",
+        action="store_true",
+        help="Ignore case sensitivity (the pattern and all strings are lowercased before matching)",
+    )
+    subparsers.add_parser("analyse")
+    subparsers.add_parser("merge")
+    subparsers.add_parser("flood")
+    subparsers.add_parser("heartbeat")
+    classify = subparsers.add_parser("classify")
     _build_argparse_classify(classify)
 
     args = parser.parse_args()

@@ -11,7 +11,7 @@ import apiclient
 
 from joblib import Memory
 
-location = './.cache/thankful'
+location = "./.cache/thankful"
 memory = Memory(location, verbose=0)
 
 logger = logging.getLogger(__name__)
@@ -26,9 +26,12 @@ re_email_addr = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
 
 YOUTUBE_API_SERVICE_NAME = "youtube"
 YOUTUBE_API_VERSION = "v3"
-YOUTUBE_DEVELOPER_KEY = "AIzaSyDSB0CRo8l4cLhxZtOSWEGuAUXfUMUBEV" + "Y"  # slight obfuscation to prevent automated mining
-youtube = apiclient.discovery.build(YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION,
-                                    developerKey=YOUTUBE_DEVELOPER_KEY)
+YOUTUBE_DEVELOPER_KEY = (
+    "AIzaSyDSB0CRo8l4cLhxZtOSWEGuAUXfUMUBEV" + "Y"
+)  # slight obfuscation to prevent automated mining
+youtube = apiclient.discovery.build(
+    YOUTUBE_API_SERVICE_NAME, YOUTUBE_API_VERSION, developerKey=YOUTUBE_DEVELOPER_KEY
+)
 
 
 class PaymentMethod:
@@ -75,6 +78,7 @@ assert find_email_address("erik@bjareho.lt")
 class Creator:
     """Creators are currently bound to platforms since cross-platform
        identity is still a non-trivial problem"""
+
     def __init__(self, service=None, identifier=None):
         self.service = service
         self.id = identifier
@@ -88,9 +92,7 @@ class Creator:
 
     def __repr__(self):
         return "<Creator('{}', title='{}', payment_methods='{}')>".format(
-            self.id,
-            self.title,
-            str(list(self.payment_methods.keys()))
+            self.id, self.title, str(list(self.payment_methods.keys()))
         )
 
     def add_youtube_data(self):
@@ -109,7 +111,7 @@ class Creator:
             self._find_eth(self.description)
             self._find_email(self.description)
         else:
-            print('No channel description')
+            print("No channel description")
 
         for c in self.creations:
             if "patreon" not in self.payment_methods:
@@ -157,7 +159,9 @@ class Content:
         self.data = {}
 
     def __repr__(self):
-        return "<Content('{}', title='{}', duration={})>".format(self.id, self.title, self.duration)
+        return "<Content('{}', title='{}', duration={})>".format(
+            self.id, self.title, self.duration
+        )
 
     def add_youtube_data(self):
         """This might not belong here when class is made more general"""
@@ -210,8 +214,12 @@ def find_youtube_content(events) -> List[Content]:
 
 def get_channels_from_videos(videos: List[Content]):
     """Finds channels from a set of videos"""
-    channels = defaultdict(lambda: Creator(service="youtube"))  # type: Dict[str, Creator]
-    channel_id_set = {video.data["channelId"] for video in videos if "channelId" in video.data}
+    channels = defaultdict(
+        lambda: Creator(service="youtube")
+    )  # type: Dict[str, Creator]
+    channel_id_set = {
+        video.data["channelId"] for video in videos if "channelId" in video.data
+    }
 
     for channel_id in channel_id_set:
         channel = channels[channel_id]
@@ -260,13 +268,21 @@ def _main():
     #         print(channel)
 
     for c in channels:
-        if c.payment_methods or c.description and re.findall('(BTC|[Bb]itcoin)|(ETH|[Ee]ther(eum)?)', c.description):
+        if (
+            c.payment_methods
+            or c.description
+            and re.findall("(BTC|[Bb]itcoin)|(ETH|[Ee]ther(eum)?)", c.description)
+        ):
             print("-" * 80)
             print(c)
             print(c.description)
 
     n_with_payment_methods = len(list(filter(lambda c: c.payment_methods, channels)))
-    print("Number of found channels with payment methods: {} out of {}".format(n_with_payment_methods, len(channels)))
+    print(
+        "Number of found channels with payment methods: {} out of {}".format(
+            n_with_payment_methods, len(channels)
+        )
+    )
 
     for method in ["eth", "bitcoin", "patreon", "email"]:
         n_with_method = len([c for c in channels if method in c.payment_methods])

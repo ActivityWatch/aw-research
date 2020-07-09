@@ -20,6 +20,7 @@ toml = "^0.10.0"
 aw-core = {git = "https://github.com/ActivityWatch/aw-core.git"}
 aw-client = {git = "https://github.com/ActivityWatch/aw-client.git"}
 google-api-python-client = "^1.9.3"
+tabulate = "^0.8.7"
 
 [tool.poetry.dev-dependencies]
 pydash = "^4.7.6"

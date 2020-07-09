@@ -14,4 +14,3 @@ from .util import (
     categorytime_per_day,
     categorytime_during_day,
 )  # noqa
-from .load_toggl import load_toggl  # noqa

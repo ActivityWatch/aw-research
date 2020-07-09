@@ -1,6 +1,6 @@
 import logging
 from typing import List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 try:
     from toggl import api
@@ -13,6 +13,15 @@ logging.getLogger("toggl.utils").setLevel(logging.WARNING)
 
 
 def load_toggl(start: datetime, stop: datetime) -> List[Event]:
+    # The Toggl API has a query limit of 1 year
+    if stop - start < timedelta(days=360):
+        return _load_toggl(start, stop)
+    else:
+        split = stop - timedelta(days=360)
+        return load_toggl(start, split) + _load_toggl(split, stop)
+
+
+def _load_toggl(start: datetime, stop: datetime) -> List[Event]:
     # [x] TODO: For some reason this doesn't get all history, consider just switching back to loading from export (at least for older events)
     # The maintainer of togglcli fixed it quickly, huge thanks! https://github.com/AuHau/toggl-cli/issues/87
 

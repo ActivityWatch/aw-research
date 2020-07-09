@@ -4,7 +4,7 @@ build:
 	poetry install
 
 test:
-	pytest tests/ aw_research/classify.py
+	pytest --cov=aw_research tests/ aw_research/*.py
 
 test-integration:
 	aw-research redact
@@ -19,7 +19,7 @@ test-integration:
 	#pipenv run python3 aw_research analyse
 
 typecheck:
-	mypy --ignore-missing-imports aw_research/ examples/ tests/
+	mypy --ignore-missing-imports --check-untyped-defs aw_research/ examples/ tests/
 
 .cache-query-result:
 	python3 -m aw_client --host localhost:5666 query --json --start 2018-01-01 queries/aw-development.awq > .cache-query-result

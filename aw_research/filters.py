@@ -25,10 +25,10 @@ def filter_datafields(events: List[Event], fields: List[str]):
     return events
 
 
-def test_filter_data():
+def test_filter_data() -> None:
     awapi = ActivityWatchClient("cleaner", testing=True)
     events = awapi.get_events("aw-watcher-web-test", limit=-1)
-    events = filter_datafields(events, "title")
+    events = filter_datafields(events, ["title"])
     assert "title" not in events[0].data
 
 

@@ -275,16 +275,11 @@ def build_query(hostname: str):
 # The following function is later turned into a query string through introspection.
 # Fancy logic will obviously not work either.
 # TODO: This doesn't correctly handle web buckets since they don't have a hostname set
+# NOTE: fmt: off is used since query2ify assumes single-line statements
+# fmt: off
 @query2ify
 def _query_complete():  # noqa
-    from aw_transform import (
-        query_bucket,
-        find_bucket,
-        filter_keyvals,
-        exclude_keyvals,
-        period_union,
-        concat,
-    )
+    from aw_transform import (query_bucket, find_bucket, filter_keyvals, exclude_keyvals, period_union, concat)
 
     hostname = ""  # set in preprocessing
 
@@ -292,17 +287,13 @@ def _query_complete():  # noqa
     browsernames_ff = ["Firefox"]  # TODO: Include more browsers
 
     events = flood(query_bucket(find_bucket("aw-watcher-window", hostname)))
-    events_afk = query_bucket(
-        find_bucket("aw-watcher-afk", hostname)
-    )  # TODO: Readd flooding for afk-events once a release has been made that includes the flooding-fix
+    events_afk = query_bucket(find_bucket("aw-watcher-afk", hostname))  # TODO: Readd flooding for afk-events once a release has been made that includes the flooding-fix
     events_web_chrome = flood(query_bucket(find_bucket("aw-watcher-web-chrome")))
     events_web_ff = flood(query_bucket(find_bucket("aw-watcher-web-firefox")))
 
     # Combine window events with web events
     events_browser_chrome = filter_keyvals(events, "app", browsernames_chrome)
-    events_web_chrome = filter_period_intersect(
-        events_web_chrome, events_browser_chrome
-    )
+    events_web_chrome = filter_period_intersect(events_web_chrome, events_browser_chrome)
 
     events_browser_ff = filter_keyvals(events, "app", browsernames_ff)
     events_web_ff = filter_period_intersect(events_web_ff, events_browser_ff)
@@ -321,6 +312,7 @@ def _query_complete():  # noqa
     events = filter_period_intersect(events, events_active)
 
     return events
+# fmt: on
 
 
 def _get_events_toggl(since: datetime, filepath: str) -> List[Event]:
@@ -501,8 +493,8 @@ def get_events(
 ) -> List[Event]:
     awc = ActivityWatchClient("test", testing=False)
 
-    # print(query_complete)
     query = build_query(hostname)
+    # print(query)
     result = awc.query(query, start=since, end=end)
     events = [Event(**e) for e in result[0]]
 

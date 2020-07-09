@@ -19,11 +19,14 @@ def split_event_on_time(event: Event, timestamp: datetime) -> Tuple[Event, Event
 
 
 def next_hour(timestamp: datetime) -> datetime:
-    return datetime.combine(timestamp.date(), time(timestamp.hour + 1)).replace(tzinfo=timestamp.tzinfo)
+    return datetime.combine(timestamp.date(), time(timestamp.hour)).replace(
+        tzinfo=timestamp.tzinfo
+    ) + timedelta(hours=1)
 
 
 def test_next_hour() -> None:
     assert next_hour(datetime(2019, 1, 1, 6, 23)) == datetime(2019, 1, 1, 7)
+    assert next_hour(datetime(2019, 1, 1, 23, 23)) == datetime(2019, 1, 2, 0)
 
 
 def split_event_on_hour(event: Event) -> List[Event]:

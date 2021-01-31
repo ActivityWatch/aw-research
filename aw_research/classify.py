@@ -495,7 +495,7 @@ def get_events(
 
     query = build_query(hostname)
     # print(query)
-    result = awc.query(query, start=since, end=end)
+    result = awc.query(query, timeperiods=[(since, end)])
     events = [Event(**e) for e in result[0]]
 
     if include_smartertime:

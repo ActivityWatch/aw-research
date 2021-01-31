@@ -8,12 +8,12 @@ authors = ["Erik Bjäreholt <erik@bjareho.lt>"]
 aw-research = "aw_research.main:main"
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.6.1"
 numpy = "^1.18.0"
 matplotlib = "^3.1.2"
 pydash = "^4.7.6"
 iso8601 = "^0.1.12"
-pandas = "^0.25.3"
+pandas = "^1.0.3"
 pytz = "^2019.3"
 joblib = "^0.14.1"
 toml = "^0.10.0"
@@ -24,7 +24,7 @@ tabulate = "^0.8.7"
 
 [tool.poetry.dev-dependencies]
 pydash = "^4.7.6"
-mypy = "^0.761"
+mypy = "*"
 pytest = "^5.3.2"
 pytest-cov = "^2.8.1"
 black = "^19.10b0"

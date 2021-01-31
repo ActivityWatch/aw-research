@@ -18,7 +18,7 @@ import pandas as pd
 import joblib
 
 from aw_core.models import Event
-from aw_core.timeperiod import TimePeriod
+from timeslot import Timeslot
 from aw_transform import flood, filter_period_intersect
 from aw_client import ActivityWatchClient
 
@@ -413,8 +413,8 @@ def _union_no_overlap(events1, events2):
     while e1_i < len(events1) and e2_i < len(events2):
         e1 = events1[e1_i]
         e2 = events2[e2_i]
-        e1_p = TimePeriod(e1.timestamp, e1.timestamp + e1.duration)
-        e2_p = TimePeriod(e2.timestamp, e2.timestamp + e2.duration)
+        e1_p = Timeslot(e1.timestamp, e1.timestamp + e1.duration)
+        e2_p = Timeslot(e2.timestamp, e2.timestamp + e2.duration)
 
         if e1_p.intersects(e2_p):
             if e1.timestamp <= e2.timestamp:

@@ -395,7 +395,7 @@ def test_split_event():
 
 
 # TODO: Move to aw-transform
-def _union_no_overlap(events1, events2):
+def _union_no_overlap(events1: List[Event], events2: List[Event]) -> List[Event]:
     """Merges two eventlists and removes overlap, the first eventlist will have precedence
 
     Example:

@@ -25,9 +25,15 @@ def filter_datafields(events: List[Event], fields: List[str]):
     return events
 
 
+# TODO: Generalize
+BUCKET_AFK = "aw-watcher-afk_erb-main2-arch"
+BUCKET_WINDOW = "aw-watcher-window_erb-main2-arch"
+BUCKET_WEB = "aw-watcher-web-firefox"
+
+
 def test_filter_data() -> None:
     awapi = ActivityWatchClient("cleaner", testing=True)
-    events = awapi.get_events("aw-watcher-web-test", limit=-1)
+    events = awapi.get_events(BUCKET_WEB, limit=-1)
     events = filter_datafields(events, ["title"])
     assert "title" not in events[0].data
 
@@ -35,13 +41,13 @@ def test_filter_data() -> None:
 def test_filter_short():
     # TODO: This was used in dev and does not work.
     awapi = ActivityWatchClient("cleaner", testing=True)
-    events = awapi.get_events("aw-watcher-web-test", limit=-1)
+    events = awapi.get_events(BUCKET_WEB, limit=-1)
     filter_short(events, threshold=1)
 
-    events = awapi.get_events("aw-watcher-window-testing_erb-main2-arch", limit=-1)
+    events = awapi.get_events(BUCKET_WINDOW, limit=-1)
     filter_short(events, threshold=1)
 
-    events = awapi.get_events("aw-watcher-afk-testing_erb-main2-arch", limit=-1)
+    events = awapi.get_events(BUCKET_AFK, limit=-1)
     filter_short(events, threshold=30)
 
 

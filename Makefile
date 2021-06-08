@@ -4,7 +4,7 @@ build:
 	poetry install
 
 test:
-	pytest --cov=aw_research tests/ aw_research/*.py
+	poetry run pytest --cov=aw_research tests/ aw_research/*.py
 
 test-integration:
 	aw-research redact

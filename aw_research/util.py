@@ -65,7 +65,7 @@ def end_of_day(dt: datetime) -> datetime:
 
 def get_week_start(dt: datetime) -> datetime:
     start = dt - timedelta(days=dt.date().weekday())
-    return datetime.combine(start.date(), time())
+    return datetime.combine(start.date(), time()).astimezone(dt.tzinfo)
 
 
 def is_in_same_week(dt1: datetime, dt2: datetime) -> bool:

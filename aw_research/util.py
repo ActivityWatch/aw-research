@@ -65,7 +65,7 @@ def end_of_day(dt: datetime) -> datetime:
 
 def get_week_start(dt: datetime) -> datetime:
     start = dt - timedelta(days=dt.date().weekday())
-    return datetime.combine(start.date(), time()).astimezone(dt.tzinfo)
+    return datetime.combine(start.date(), time(), tzinfo=dt.tzinfo)
 
 
 def is_in_same_week(dt1: datetime, dt2: datetime) -> bool:
@@ -83,7 +83,20 @@ def split_into_weeks(start: datetime, end: datetime) -> List[Tuple[datetime, dat
 
 
 def test_split_into_weeks() -> None:
-    split = split_into_weeks(datetime(2019, 1, 3, 12), datetime(2019, 1, 18, 0, 2))
+    # tznaive
+    split = split_into_weeks(
+        datetime(2019, 1, 3, 12),
+        datetime(2019, 1, 18, 0, 2),
+    )
+    for dtstart, dtend in split:
+        print(dtstart, dtend)
+    assert len(split) == 3
+
+    # tzaware
+    split = split_into_weeks(
+        datetime(2019, 1, 3, 12, tzinfo=timezone.utc),
+        datetime(2019, 1, 18, 0, 2, tzinfo=timezone.utc),
+    )
     for dtstart, dtend in split:
         print(dtstart, dtend)
     assert len(split) == 3

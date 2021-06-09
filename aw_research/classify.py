@@ -378,8 +378,9 @@ def get_events(
     end: datetime,
     include_smartertime="auto",
     include_toggl=None,
+    testing: bool = False,
 ) -> List[Event]:
-    awc = ActivityWatchClient("test", testing=False)
+    awc = ActivityWatchClient("test", testing=testing)
 
     query = build_query(hostname)
     logger.debug(f"Query:\n{query}")

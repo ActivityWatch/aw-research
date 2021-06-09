@@ -1,4 +1,5 @@
 import typing
+import logging
 from typing import List, Dict, Optional, Tuple, Set
 
 import argparse
@@ -23,6 +24,7 @@ from aw_client import ActivityWatchClient
 from .plot_sunburst import sunburst
 
 
+logger = logging.getLogger(__name__)
 memory = joblib.Memory("./.cache/joblib")
 
 
@@ -261,7 +263,7 @@ def query2ify(f) -> str:
     srclines = [
         l if "return" not in l else l.replace("return", "RETURN = ") for l in srclines
     ]
-    return ";\n".join(srclines)
+    return ";\n".join(srclines) + ";"
 
 
 def build_query(hostname: str):
@@ -380,7 +382,8 @@ def get_events(
     awc = ActivityWatchClient("test", testing=False)
 
     query = build_query(hostname)
-    # print(query)
+    logger.debug(f"Query:\n{query}")
+
     result = awc.query(query, timeperiods=[(since, end)])
     events = [Event(**e) for e in result[0]]
 

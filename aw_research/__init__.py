@@ -1,5 +1,6 @@
 from . import redact
 from . import merge
+from . import tree
 from .util import (
     split_event_on_time,
     next_hour,

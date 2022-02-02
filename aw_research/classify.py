@@ -203,6 +203,7 @@ def time_per_category(events: List[Event], unfold=True) -> typing.Counter[str]:
         else:
             cats = [e.data["$category_hierarchy"]]
         for cat in cats:
+            # FIXME: This will be wrong when subcategories with the same name exist with different parents
             c[cat] += e.duration.total_seconds()
     return c
 
@@ -251,17 +252,23 @@ def query2ify(f) -> str:
     import inspect
 
     srclines = inspect.getsource(f).split("\n")
-    srclines = srclines[2:]  # remove decoration and function definition
+    # remove decoration and function definition
+    srclines = srclines[2:]
+    # remove comments (as query2 doesn't yet support them)
     srclines = [
-        l.split("#")[0] for l in srclines
-    ]  # remove comments (as query2 doesn't yet support them)
-    srclines = [l.strip() for l in srclines]  # remove indentation
-    srclines = [l for l in srclines if l]  # remove blank lines
+        ln.split("#")[0] for ln in srclines
+    ]
+    # remove indentation
+    srclines = [ln.strip() for ln in srclines]
+    # remove blank lines
+    srclines = [ln for ln in srclines if ln]
+    # remove import statements
     srclines = [
-        l for l in srclines if not (l.startswith("import") or l.startswith("from"))
-    ]  # remove import statements
+        ln for ln in srclines if not (ln.startswith("import") or ln.startswith("from"))
+    ]
+    # replace `return ...` with `RETURN = ...`
     srclines = [
-        l if "return" not in l else l.replace("return", "RETURN = ") for l in srclines
+        ln if "return" not in ln else ln.replace("return", "RETURN = ") for ln in srclines
     ]
     return ";\n".join(srclines) + ";"
 

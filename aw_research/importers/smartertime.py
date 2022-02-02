@@ -44,7 +44,7 @@ def import_as_bucket(filepath):
         "event_type": "smartertime.v0",
         "client": "",
         "hostname": "",
-        "data": {"readonly": True,},
+        "data": {"readonly": True},
         "events": events,
     }
     return bucket

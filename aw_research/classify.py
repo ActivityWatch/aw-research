@@ -255,9 +255,7 @@ def query2ify(f) -> str:
     # remove decoration and function definition
     srclines = srclines[2:]
     # remove comments (as query2 doesn't yet support them)
-    srclines = [
-        ln.split("#")[0] for ln in srclines
-    ]
+    srclines = [ln.split("#")[0] for ln in srclines]
     # remove indentation
     srclines = [ln.strip() for ln in srclines]
     # remove blank lines
@@ -268,7 +266,8 @@ def query2ify(f) -> str:
     ]
     # replace `return ...` with `RETURN = ...`
     srclines = [
-        ln if "return" not in ln else ln.replace("return", "RETURN = ") for ln in srclines
+        ln if "return" not in ln else ln.replace("return", "RETURN = ")
+        for ln in srclines
     ]
     return ";\n".join(srclines) + ";"
 
@@ -378,17 +377,15 @@ def _get_events_smartertime(since: datetime, filepath: str = "auto") -> List[Eve
     return events
 
 
-@memory.cache
+@memory.cache(ignore=["awc"])
 def get_events(
+    awc: ActivityWatchClient,
     hostname: str,
     since: datetime,
     end: datetime,
     include_smartertime="auto",
     include_toggl=None,
-    testing: bool = False,
 ) -> List[Event]:
-    awc = ActivityWatchClient("test", testing=testing)
-
     query = build_query(hostname)
     logger.debug(f"Query:\n{query}")
 

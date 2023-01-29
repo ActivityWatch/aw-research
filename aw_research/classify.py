@@ -147,7 +147,12 @@ def classify(
         e.data["$category_hierarchy"] = "Uncategorized"
 
     for re_pattern, cat, _ in classes:
-        r = re.compile(re_pattern)
+        try:
+            r = re.compile(re_pattern)
+        except Exception:
+            logger.warning(f"Failed to compile regex for {cat}: {re_pattern}")
+            continue
+
         for e in events:
             for attr in ["title", "app", "url"]:
                 if attr not in e.data:
@@ -294,27 +299,30 @@ def _query_complete():  # noqa
 
     events = flood(query_bucket(find_bucket("aw-watcher-window", hostname)))
     events_afk = query_bucket(find_bucket("aw-watcher-afk", hostname))  # TODO: Readd flooding for afk-events once a release has been made that includes the flooding-fix
-    events_web_chrome = flood(query_bucket(find_bucket("aw-watcher-web-chrome")))
-    events_web_ff = flood(query_bucket(find_bucket("aw-watcher-web-firefox")))
+
+    # Web stuff is commented out since I don't sync them to my sync testing aw-server instance
+    #events_web_chrome = flood(query_bucket(find_bucket("aw-watcher-web-chrome")))
+    #events_web_ff = flood(query_bucket(find_bucket("aw-watcher-web-firefox")))
 
     # Combine window events with web events
-    events_browser_chrome = filter_keyvals(events, "app", browsernames_chrome)
-    events_web_chrome = filter_period_intersect(events_web_chrome, events_browser_chrome)
+    #events_browser_chrome = filter_keyvals(events, "app", browsernames_chrome)
+    #events_web_chrome = filter_period_intersect(events_web_chrome, events_browser_chrome)
 
-    events_browser_ff = filter_keyvals(events, "app", browsernames_ff)
-    events_web_ff = filter_period_intersect(events_web_ff, events_browser_ff)
+    #events_browser_ff = filter_keyvals(events, "app", browsernames_ff)
+    #events_web_ff = filter_period_intersect(events_web_ff, events_browser_ff)
 
-    events_web = concat(events_web_chrome, events_web_ff)
+    #events_web = concat(events_web_chrome, events_web_ff)
 
     # TODO: Browser events should only be excluded when there's a web-event replacing it
-    events = exclude_keyvals(events, "app", browsernames_chrome)
-    events = exclude_keyvals(events, "app", browsernames_ff)
-    events = concat(events, events_web)
+    #events = exclude_keyvals(events, "app", browsernames_chrome)
+    #events = exclude_keyvals(events, "app", browsernames_ff)
+    #events = concat(events, events_web)
 
     # Filter away all inactive (afk and non-audible) time
     events_notafk = filter_keyvals(events_afk, "status", ["not-afk"])
-    events_audible = filter_keyvals(events_web, "audible", [True])
-    events_active = period_union(events_notafk, events_audible)
+    #events_audible = filter_keyvals(events_web, "audible", [True])
+    #events_active = period_union(events_notafk, events_audible)
+    events_active = events_notafk
     events = filter_period_intersect(events, events_active)
 
     return events

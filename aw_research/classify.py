@@ -1,28 +1,31 @@
-import typing
-import logging
-from typing import List, Dict, Optional, Tuple, Set
-
 import argparse
-import re
 import json
-from urllib.parse import urlparse
+import logging
+import re
+import typing
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from typing import (
+    Dict,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
+from urllib.parse import urlparse
 
-import toml
-import pytz
-import pydash
+import joblib
 import matplotlib.pyplot as plt
 import pandas as pd
-import joblib
-
-from aw_core.models import Event
-from aw_transform import flood, filter_period_intersect, union_no_overlap
+import pydash
+import pytz
+import toml
 from aw_client import ActivityWatchClient
+from aw_core.models import Event
+from aw_transform import filter_period_intersect, flood, union_no_overlap
 
 from .plot_sunburst import sunburst
-
 
 logger = logging.getLogger(__name__)
 memory = joblib.Memory("./.cache/joblib")
@@ -358,7 +361,8 @@ def _get_events_toggl(since: datetime, filepath: str) -> List[Event]:
 
 
 def _get_events_smartertime(since: datetime, filepath: str = "auto") -> List[Event]:
-    # TODO: Use aw_research.importers.smartertime to generate json file if filepath is smartertime export (.csv)
+    # TODO: Use quantifiedme.load.smartertime to generate json file if filepath is smartertime export (.csv)
+    # NOTE: deprecated, use methods in quantifiedme instead
     if filepath == "auto":
         from glob import glob
 

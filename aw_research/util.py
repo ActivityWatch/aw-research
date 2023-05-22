@@ -1,8 +1,12 @@
+from datetime import (
+    datetime,
+    time,
+    timedelta,
+    timezone,
+)
 from typing import List, Tuple
-from datetime import datetime, time, timedelta, timezone
 
 import pandas as pd
-
 from aw_core import Event
 
 
@@ -119,7 +123,8 @@ def test_split_into_days() -> None:
     assert len(split) == 4
 
 
-def verify_no_overlap(events: List[Event]):
+def verify_no_overlap(events: List[Event]) -> None:
+    events = sorted(events, key=lambda e: e.timestamp)
     try:
         assert all(
             [
@@ -127,17 +132,88 @@ def verify_no_overlap(events: List[Event]):
                 for e1, e2 in zip(events[:-1], events[1:])
             ]
         )
-    except AssertionError as e:
-        n_overlaps = 0
-        total_overlap = timedelta()
-        for e1, e2 in zip(events[:-1], events[1:]):
-            if e1.timestamp + e1.duration > e2.timestamp:
-                overlap = (e1.timestamp + e1.duration) - e2.timestamp
-                n_overlaps += 1
-                total_overlap += overlap
+    except AssertionError:
+        n_overlaps, total_overlap = compute_total_overlap(events)
         print(
             f"[WARNING] Found {n_overlaps} events overlapping, totalling: {total_overlap}"
         )
+
+
+def compute_total_overlap(events: List[Event]) -> Tuple[int, timedelta]:
+    events = sorted(events, key=lambda e: e.timestamp)
+    n_overlaps = 0
+    total_overlap = timedelta()
+    i, j = 0, 1
+    assert len(events) > 1
+    while j < len(events):
+        e1, e2 = events[i], events[j]
+        if e1.timestamp + e1.duration > e2.timestamp:
+            n_overlaps += 1
+            overlap_start = max(e1.timestamp, e2.timestamp)
+            overlap_end = min(e1.timestamp + e1.duration, e2.timestamp + e2.duration)
+            total_overlap += overlap_end - overlap_start
+            j += 1
+            print("j+")
+        else:
+            if j - i > 1:
+                # if j isn't directly ahead of i, we can skip ahead
+                i += 1
+                print("i+")
+            else:
+                # if j is directly ahead of i, we can step both forward
+                i += 1
+                j += 1
+                print("i=j+")
+    return n_overlaps, total_overlap
+
+
+def test_compute_total_overlap() -> None:
+    # Simple test
+    events = [
+        Event(
+            timestamp=datetime(2019, 1, 1, 12, tzinfo=timezone.utc),
+            duration=timedelta(hours=1),
+        ),
+        Event(
+            timestamp=datetime(2019, 1, 1, 12, 30, tzinfo=timezone.utc),
+            duration=timedelta(hours=1),
+        ),
+    ]
+    assert compute_total_overlap(events) == (1, timedelta(minutes=30))
+
+    # Test with multiple overlaps in sequence after long event
+    events = [
+        Event(
+            timestamp=datetime(2019, 1, 1, 12, tzinfo=timezone.utc),
+            duration=timedelta(hours=2),
+        ),
+        Event(
+            timestamp=datetime(2019, 1, 1, 12, 30, tzinfo=timezone.utc),
+            duration=timedelta(hours=1),
+        ),
+        Event(
+            timestamp=datetime(2019, 1, 1, 13, 30, tzinfo=timezone.utc),
+            duration=timedelta(hours=1),
+        ),
+    ]
+    assert compute_total_overlap(events) == (2, timedelta(minutes=90))
+
+    # Test with multiple overlaps in sequence after long event, with inter-overlap overlap
+    events = [
+        Event(
+            timestamp=datetime(2019, 1, 1, 12, tzinfo=timezone.utc),
+            duration=timedelta(hours=2),
+        ),
+        Event(
+            timestamp=datetime(2019, 1, 1, 12, 30, tzinfo=timezone.utc),
+            duration=timedelta(hours=1),
+        ),
+        Event(
+            timestamp=datetime(2019, 1, 1, 13, 15, tzinfo=timezone.utc),
+            duration=timedelta(minutes=15),
+        ),
+    ]
+    assert compute_total_overlap(events) == (2, timedelta(minutes=75))
 
 
 # TODO: Write test that ensures timezone localization is handled correctly

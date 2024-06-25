@@ -1,3 +1,4 @@
+import logging
 from datetime import (
     datetime,
     time,
@@ -8,6 +9,8 @@ from typing import List, Tuple
 
 import pandas as pd
 from aw_core import Event
+
+logger = logging.getLogger(__name__)
 
 
 def split_event_on_time(event: Event, timestamp: datetime) -> Tuple[Event, Event]:
@@ -153,17 +156,17 @@ def compute_total_overlap(events: List[Event]) -> Tuple[int, timedelta]:
             overlap_end = min(e1.timestamp + e1.duration, e2.timestamp + e2.duration)
             total_overlap += overlap_end - overlap_start
             j += 1
-            print("j+")
+            logger.debug("j+")
         else:
             if j - i > 1:
                 # if j isn't directly ahead of i, we can skip ahead
                 i += 1
-                print("i+")
+                logger.debug("i+")
             else:
                 # if j is directly ahead of i, we can step both forward
                 i += 1
                 j += 1
-                print("i=j+")
+                logger.debug("i=j+")
     return n_overlaps, total_overlap
 
 

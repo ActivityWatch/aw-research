@@ -138,3 +138,17 @@ def test_tie_broken_by_definition_order():
     (e,) = cl.classify([_event("a b")])
     # the later definition wins, like aw-server
     assert e.data["$category_hierarchy"] == "A"
+
+
+def test_null_fields_are_skipped():
+    # Some watchers/imports emit null titles/apps/urls; classify must not raise.
+    cl._init_classes(new_classes=CLASSES)
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    evs = [
+        Event(timestamp=now, duration=timedelta(hours=1), data={"app": None, "title": None}),
+        Event(timestamp=now + timedelta(hours=1), duration=timedelta(hours=1),
+              data={"app": "Steam", "title": None, "url": None}),
+    ]
+    out = cl.classify(evs)
+    assert event_categories(out[0]) == ["Uncategorized"]
+    assert event_categories(out[1]) == ["Games"]  # app still matches with null title/url

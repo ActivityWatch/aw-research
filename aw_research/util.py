@@ -277,4 +277,4 @@ def categorytime_during_day(
         [e.duration.total_seconds() / 3600 for e in events],
         index=pd.DatetimeIndex([e.timestamp for e in events]),
     )
-    return ts.resample("1H").apply("sum")
+    return ts.resample("1h").apply("sum")

@@ -8,7 +8,7 @@ authors = ["Erik Bjäreholt <erik@bjareho.lt>"]
 aw-research = "aw_research.main:main"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.12,<4"
 aw-core = "^0.5"
 aw-client = "^0.5"
 numpy = "*"
@@ -22,12 +22,12 @@ toml = "*"
 google-api-python-client = "*"
 tabulate = "*"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 mypy = "*"
 pytest = "*"
 pytest-cov = "*"
 black = "*"
 
 [build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

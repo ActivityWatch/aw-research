@@ -536,8 +536,12 @@ day_offset = timedelta(hours=4)
 
 
 def _plot_category_daily_trend(events, categories):
+    ax = None
     for cat in categories:
         events_cat = [e for e in events if in_category(e, cat)]
+        if not events_cat:
+            logger.warning(f"No events in category: {cat}")
+            continue
         ts = pd.Series(
             [e.duration.total_seconds() / 3600 for e in events_cat],
             index=pd.DatetimeIndex([e.timestamp for e in events_cat]).tz_convert("UTC"),
@@ -554,6 +558,8 @@ def _plot_category_daily_trend(events, categories):
             .mean()
             .plot(label=f"{cat} 30d rolling", legend=True)
         )
+    if ax is None:
+        return
     ax.set_ylabel("Hours")
     plt.xticks(rotation="vertical")
     plt.ylim(0)

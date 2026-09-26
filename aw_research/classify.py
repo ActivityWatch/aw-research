@@ -181,9 +181,12 @@ def classify(
 
         for e in events:
             for attr in ["title", "app", "url"]:
-                if attr not in e.data:
+                value = e.data.get(attr)
+                # Missing or non-string values (e.g. a null title from some
+                # watchers/imports) can't match a rule; skip instead of raising.
+                if not isinstance(value, str):
                     continue
-                if cat not in e.data["$tags"] and r.findall(e.data[attr]):
+                if cat not in e.data["$tags"] and r.findall(value):
                     e.data["$tags"].add(cat)
                     e.data["$tags"] |= get_parent_categories(cat)
 

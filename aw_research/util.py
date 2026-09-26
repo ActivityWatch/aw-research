@@ -12,6 +12,20 @@ from aw_core import Event
 
 logger = logging.getLogger(__name__)
 
+# Separator used to join category path segments in "$category_hierarchy"
+# (matches aw_research.classify.hier_sep, rendered with surrounding spaces).
+_HIER_SEP = " -> "
+
+
+def _in_category(event: Event, category: str) -> bool:
+    """True if ``category`` is one of the event's category-path segments.
+
+    Matches on exact path segments rather than a substring of the joined
+    hierarchy string, so e.g. category "P" does not match "Programming"
+    and "Work" does not match "Homework".
+    """
+    return category in event.data["$category_hierarchy"].split(_HIER_SEP)
+
 
 def split_event_on_time(event: Event, timestamp: datetime) -> Tuple[Event, Event]:
     event1 = Event(**event)
@@ -221,7 +235,7 @@ def test_compute_total_overlap() -> None:
 
 # TODO: Write test that ensures timezone localization is handled correctly
 def categorytime_per_day(events, category):
-    events = [e for e in events if category in e.data["$category_hierarchy"]]
+    events = [e for e in events if _in_category(e, category)]
     if not events:
         raise Exception("No events to calculate on")
     ts = pd.Series(
@@ -235,7 +249,7 @@ def categorytime_per_day(events, category):
 def categorytime_during_day(
     events: List[Event], category: str, day: datetime
 ) -> pd.Series:
-    events = [e for e in events if category in e.data["$category_hierarchy"]]
+    events = [e for e in events if _in_category(e, category)]
     events = [e for e in events if e.timestamp > day]
     _events = []
     for e in events:

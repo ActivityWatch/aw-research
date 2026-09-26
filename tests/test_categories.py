@@ -95,6 +95,15 @@ def test_deep_hierarchy(events):
     assert _hours(events, "Datastore") == 16
 
 
+def test_hierarchy_query(events):
+    # full hierarchy labels match as a prefix of the category path
+    assert _hours(events, "Work -> Programming") == 1 + 16
+    assert _hours(events, "Work -> Programming -> ActivityWatch -> Server") == 16
+    assert _hours(events, "P -> Games(P)") == 4
+    assert not any(in_category(e, "Programming -> ActivityWatch") for e in events)
+    assert not any(in_category(e, "Work -> P") for e in events)
+
+
 def test_app_segment_not_a_category():
     cl._init_classes(new_classes=CLASSES)
     (e,) = cl.classify([_event("Steam", app="Lutris")], include_app=True)

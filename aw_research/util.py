@@ -238,11 +238,17 @@ def in_category(e: Event, category: str) -> bool:
     Returns True if the event belongs to ``category`` (or one of its subcategories).
 
     Matches whole category names exactly, so "P" does not match "Programming".
+    A hierarchy like "Work -> Programming" (as produced by ``time_per_category``)
+    matches events whose category path starts with those categories.
     An empty category matches all events.
     """
     if not category:
         return True
-    return category in event_categories(e)
+    path = event_categories(e)
+    if "->" in category:
+        segments = [c.strip() for c in category.split("->")]
+        return path[: len(segments)] == segments
+    return category in path
 
 
 # TODO: Write test that ensures timezone localization is handled correctly

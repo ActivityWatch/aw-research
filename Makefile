@@ -19,7 +19,7 @@ test-integration:
 	#pipenv run python3 aw_research analyse
 
 typecheck:
-	mypy --ignore-missing-imports --check-untyped-defs aw_research/ examples/ tests/
+	poetry run mypy --ignore-missing-imports --check-untyped-defs aw_research/ examples/ tests/
 
 style-fix:
 	black aw_research/ tests/

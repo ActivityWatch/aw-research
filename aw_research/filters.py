@@ -34,11 +34,12 @@ BUCKET_WEB = "aw-watcher-web-firefox"
 def _testing_client() -> ActivityWatchClient:
     """Returns a client for a testing server, skipping the test if none is running."""
     import pytest
+    import requests
 
     awapi = ActivityWatchClient("cleaner", testing=True)
     try:
         awapi.get_info()
-    except Exception:
+    except requests.exceptions.ConnectionError:
         pytest.skip("requires an aw-server running in testing mode")
     return awapi
 

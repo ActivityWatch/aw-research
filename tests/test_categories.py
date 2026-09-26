@@ -136,4 +136,5 @@ def test_tie_broken_by_definition_order():
     classes: List[Tuple[str, str, Optional[str]]] = [("b", "B", None), ("a", "A", None)]
     cl._init_classes(new_classes=classes)
     (e,) = cl.classify([_event("a b")])
-    assert e.data["$category_hierarchy"] == "B"
+    # the later definition wins, like aw-server
+    assert e.data["$category_hierarchy"] == "A"

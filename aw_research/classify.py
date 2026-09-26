@@ -187,19 +187,17 @@ def classify(
                     e.data["$tags"].add(cat)
                     e.data["$tags"] |= get_parent_categories(cat)
 
-    cat_order: Dict[str, int] = {}
-    for _, cat, _ in classes:
-        cat_order.setdefault(cat, len(cat_order))
+    # index of the last definition of each category
+    cat_order: Dict[str, int] = {cat: i for i, (_, cat, _) in enumerate(classes)}
 
     for e in events:
         app = e.data.get("app", None) if include_app else None
         if e.data["$tags"]:
             # Always assign the deepest category.
-            # Ties are broken by the order in which the categories are defined
-            # (like aw-webui), not by set iteration order which varies between runs.
-            tags = sorted(
-                e.data["$tags"], key=lambda c: (cat_order.get(c, len(cat_order)), c)
-            )
+            # Ties are broken by definition order, the later definition winning
+            # (like aw-server's categorize), not by set iteration order which
+            # varies between runs.
+            tags = sorted(e.data["$tags"], key=lambda c: (-cat_order.get(c, -1), c))
             path = max((build_category_path(cat) for cat in tags), key=len)
             e.data["$category_path"] = path
             e.data["$category_hierarchy"] = build_category_hierarchy(path[-1], app=app)

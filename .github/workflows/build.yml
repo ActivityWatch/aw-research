@@ -27,7 +27,7 @@ jobs:
       # poetry.lock is stale (pins wheels that don't exist for newer Pythons),
       # so resolve dependencies from pyproject.toml instead.
       run: |
-        pip install . pytest pytest-cov mypy
+        pip install -e . pytest pytest-cov mypy
     - name: Run tests
       run: |
         pytest --cov=aw_research tests/ aw_research/*.py

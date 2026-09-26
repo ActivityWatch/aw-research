@@ -31,8 +31,20 @@ BUCKET_WINDOW = "aw-watcher-window_erb-main2-arch"
 BUCKET_WEB = "aw-watcher-web-firefox"
 
 
-def test_filter_data() -> None:
+def _testing_client() -> ActivityWatchClient:
+    """Returns a client for a testing server, skipping the test if none is running."""
+    import pytest
+
     awapi = ActivityWatchClient("cleaner", testing=True)
+    try:
+        awapi.get_info()
+    except Exception:
+        pytest.skip("requires an aw-server running in testing mode")
+    return awapi
+
+
+def test_filter_data() -> None:
+    awapi = _testing_client()
     events = awapi.get_events(BUCKET_WEB, limit=-1)
     events = filter_datafields(events, ["title"])
     assert "title" not in events[0].data
@@ -40,7 +52,7 @@ def test_filter_data() -> None:
 
 def test_filter_short():
     # TODO: This was used in dev and does not work.
-    awapi = ActivityWatchClient("cleaner", testing=True)
+    awapi = _testing_client()
     events = awapi.get_events(BUCKET_WEB, limit=-1)
     filter_short(events, threshold=1)
 

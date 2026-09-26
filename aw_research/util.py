@@ -219,9 +219,41 @@ def test_compute_total_overlap() -> None:
     assert compute_total_overlap(events) == (2, timedelta(minutes=75))
 
 
+def event_categories(e: Event) -> List[str]:
+    """
+    Returns the categories an event is assigned to: its assigned category and all its parents.
+
+    Uses ``$category_path`` (set by ``classify``) if available, otherwise falls
+    back to splitting ``$category_hierarchy`` into its segments.
+    Note that the fallback cannot tell an appended app name (``include_app=True``)
+    apart from a category, and may be truncated by ``max_category_depth``.
+    """
+    if "$category_path" in e.data:
+        return list(e.data["$category_path"])
+    return [c.strip() for c in e.data["$category_hierarchy"].split("->")]
+
+
+def in_category(e: Event, category: str) -> bool:
+    """
+    Returns True if the event belongs to ``category`` (or one of its subcategories).
+
+    Matches whole category names exactly, so "P" does not match "Programming".
+    A hierarchy like "Work -> Programming" (as produced by ``time_per_category``)
+    matches events whose category path starts with those categories.
+    An empty category matches all events.
+    """
+    if not category:
+        return True
+    path = event_categories(e)
+    if "->" in category:
+        segments = [c.strip() for c in category.split("->")]
+        return path[: len(segments)] == segments
+    return category in path
+
+
 # TODO: Write test that ensures timezone localization is handled correctly
 def categorytime_per_day(events, category):
-    events = [e for e in events if category in e.data["$category_hierarchy"]]
+    events = [e for e in events if in_category(e, category)]
     if not events:
         raise Exception("No events to calculate on")
     ts = pd.Series(
@@ -235,7 +267,7 @@ def categorytime_per_day(events, category):
 def categorytime_during_day(
     events: List[Event], category: str, day: datetime
 ) -> pd.Series:
-    events = [e for e in events if category in e.data["$category_hierarchy"]]
+    events = [e for e in events if in_category(e, category)]
     events = [e for e in events if e.timestamp > day]
     _events = []
     for e in events:

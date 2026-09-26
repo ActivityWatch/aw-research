@@ -36,6 +36,13 @@ def _event(title: str, hours: float = 1.0, offset_h: float = 0, app="app") -> Ev
     )
 
 
+@pytest.fixture(autouse=True)
+def restore_classes(monkeypatch):
+    # restore the module-level classifier config after each test
+    for attr in ["classes", "parent_categories"]:
+        monkeypatch.setattr(cl, attr, getattr(cl, attr))
+
+
 @pytest.fixture
 def events():
     cl._init_classes(new_classes=CLASSES)

@@ -26,6 +26,7 @@ from aw_core.models import Event
 from aw_transform import filter_period_intersect, flood, union_no_overlap
 
 from .plot_sunburst import sunburst
+from .util import in_category
 
 logger = logging.getLogger(__name__)
 memory = joblib.Memory("./.cache/joblib")
@@ -107,7 +108,7 @@ def requires_init_classes(f):
 
 @requires_init_classes
 def get_parent_categories(cat: str) -> Set[str]:
-    assert parent_categories  # just to quiet typechecker, checked by decorator
+    assert parent_categories is not None  # checked by decorator
 
     # Recursive
     if cat in parent_categories:
@@ -123,7 +124,7 @@ hier_sep = "->"
 
 @requires_init_classes
 def build_category_hierarchy(cat: str, app: str = None) -> str:
-    assert parent_categories  # just to quiet typechecker, checked by decorator
+    assert parent_categories is not None  # checked by decorator
 
     # Recursive
     s = cat
@@ -140,6 +141,27 @@ def build_category_hierarchy(cat: str, app: str = None) -> str:
 
 
 @requires_init_classes
+def build_category_path(cat: str) -> List[str]:
+    """
+    Returns the list of category names from the root to ``cat`` (inclusive).
+
+    Unlike ``build_category_hierarchy`` this never includes an app name and is
+    never truncated, so it can be used for exact category membership checks.
+    """
+    assert parent_categories is not None  # checked by decorator
+
+    path = [cat]
+    seen = {cat}
+    while path[0] in parent_categories:
+        parent = parent_categories[path[0]]
+        if parent in seen:
+            break  # guard against cyclic category definitions
+        seen.add(parent)
+        path.insert(0, parent)
+    return path
+
+
+@requires_init_classes
 def classify(
     events: List[Event], include_app=False, max_category_depth=3
 ) -> List[Event]:
@@ -148,6 +170,7 @@ def classify(
     for e in events:
         e.data["$tags"] = set()
         e.data["$category_hierarchy"] = "Uncategorized"
+        e.data["$category_path"] = ["Uncategorized"]
 
     for re_pattern, cat, _ in classes:
         try:
@@ -164,16 +187,22 @@ def classify(
                     e.data["$tags"].add(cat)
                     e.data["$tags"] |= get_parent_categories(cat)
 
+    cat_order: Dict[str, int] = {}
+    for _, cat, _ in classes:
+        cat_order.setdefault(cat, len(cat_order))
+
     for e in events:
         app = e.data.get("app", None) if include_app else None
-        for cat in e.data["$tags"]:
-            # Always assign the deepest category
-            new_cat_hier = build_category_hierarchy(cat, app=app)
-            if "$category_hierarchy" in e.data:
-                old_cat_hier = e.data["$category_hierarchy"]
-                if old_cat_hier.count(hier_sep) >= new_cat_hier.count(hier_sep):
-                    continue
-            e.data["$category_hierarchy"] = new_cat_hier
+        if e.data["$tags"]:
+            # Always assign the deepest category.
+            # Ties are broken by the order in which the categories are defined
+            # (like aw-webui), not by set iteration order which varies between runs.
+            tags = sorted(
+                e.data["$tags"], key=lambda c: (cat_order.get(c, len(cat_order)), c)
+            )
+            path = max((build_category_path(cat) for cat in tags), key=len)
+            e.data["$category_path"] = path
+            e.data["$category_hierarchy"] = build_category_hierarchy(path[-1], app=app)
 
         # Restrict maximum category depth
         e.data["$category_hierarchy"] = _restrict_category_depth(
@@ -510,7 +539,7 @@ day_offset = timedelta(hours=4)
 
 def _plot_category_daily_trend(events, categories):
     for cat in categories:
-        events_cat = [e for e in events if cat in e.data["$category_hierarchy"]]
+        events_cat = [e for e in events if in_category(e, cat)]
         ts = pd.Series(
             [e.duration.total_seconds() / 3600 for e in events_cat],
             index=pd.DatetimeIndex([e.timestamp for e in events_cat]).tz_convert("UTC"),

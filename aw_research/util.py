@@ -238,7 +238,10 @@ def in_category(e: Event, category: str) -> bool:
     Returns True if the event belongs to ``category`` (or one of its subcategories).
 
     Matches whole category names exactly, so "P" does not match "Programming".
+    An empty category matches all events.
     """
+    if not category:
+        return True
     return category in event_categories(e)
 
 

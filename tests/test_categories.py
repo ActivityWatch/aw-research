@@ -111,6 +111,9 @@ def test_fallback_without_category_path():
 def test_categorytime_during_day(events):
     ts = categorytime_during_day(events, "P", T0 - timedelta(hours=1))
     assert ts.sum() == 4
+    # empty category matches all events
+    ts = categorytime_during_day(events, "", T0 - timedelta(hours=1))
+    assert ts.sum() == 1 + 2 + 4 + 8 + 16
 
 
 def test_tie_broken_by_definition_order():

@@ -172,6 +172,12 @@ def classify(
         e.data["$category_hierarchy"] = "Uncategorized"
         e.data["$category_path"] = ["Uncategorized"]
 
+    # Rules only look at title/app/url, and those repeat heavily (the same window
+    # title recurs many times), so match each distinct combination once.
+    attrs = ("title", "app", "url")
+    keys = {tuple(e.data.get(a) for a in attrs) for e in events}
+    key_tags: Dict[tuple, Set[str]] = {k: set() for k in keys}
+
     for re_pattern, cat, _ in classes:
         try:
             r = re.compile(re_pattern)
@@ -179,16 +185,20 @@ def classify(
             logger.warning(f"Failed to compile regex for {cat}: {re_pattern}")
             continue
 
-        for e in events:
-            for attr in ["title", "app", "url"]:
-                value = e.data.get(attr)
-                # Missing or non-string values (e.g. a null title from some
-                # watchers/imports) can't match a rule; skip instead of raising.
-                if not isinstance(value, str):
-                    continue
-                if cat not in e.data["$tags"] and r.findall(value):
-                    e.data["$tags"].add(cat)
-                    e.data["$tags"] |= get_parent_categories(cat)
+        parents = None
+        for key, tags in key_tags.items():
+            if cat in tags:
+                continue
+            # Missing or non-string values (e.g. a null title from some
+            # watchers/imports) can't match a rule; skip instead of raising.
+            if any(isinstance(v, str) and r.search(v) for v in key):
+                if parents is None:
+                    parents = get_parent_categories(cat)
+                tags.add(cat)
+                tags |= parents
+
+    for e in events:
+        e.data["$tags"] = set(key_tags[tuple(e.data.get(a) for a in attrs)])
 
     # index of the last definition of each category
     cat_order: Dict[str, int] = {cat: i for i, (_, cat, _) in enumerate(classes)}
